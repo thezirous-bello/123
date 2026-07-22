@@ -1,0 +1,57 @@
+COOKIE POLICY
+Last updated May 21, 2024
+
+This Cookie Policy explains how BarnacleAI, operated by BarnacleAI PTE LTD, and subsidiaries, affiliates, licensees, and/or licensors of BarnacleAI PTE LTD ("Company," "we," "us," and "our") uses cookies and similar technologies to recognize you when you visit our websites at support@barnacleai.com, mobile applications, clients, applets, and other applications ("Websites"). It explains what these technologies are and why we use them, as well as your rights to control our use of them.
+
+In some cases, we may use cookies to collect personal information, or that becomes personal information if we combine it with other information.
+
+What are cookies?
+
+Cookies are small data files that are placed on your computer or mobile device when you visit a website. Cookies are used to store and receive identifiers and other information on computers, phones, and other devices, which may include content viewed, language preference, time and duration of each visit, and advertisements accessed. Cookies are widely used by website owners to make their websites work or to work more efficiently, as well as to provide reporting information.
+
+Cookies managed by us are "first-party cookies." Cookies set by parties other than BarnacleAI are called "third-party cookies." Third-party cookies enable third-party features or functionality to be provided on or through the website (e.g., advertising, interactive content, and analytics). The parties that set these third-party cookies can recognize your computer both when it visits the website in question and also when it visits certain other websites.
+
+Why do we use cookies?
+
+We use first- and third-party cookies for several reasons. Some cookies are required for technical reasons for our Websites to operate, and we refer to these as "essential" or "strictly necessary" cookies. Other cookies also enable us to track and target the interests of our users to enhance the experience on our website and mobile applications. Cookies are a useful mechanism that performs various jobs, such as letting you navigate between pages efficiently, remembering your preferences, and generally improving the user experience. They can help ensure that the advertisements you see online are more relevant to you and your interests and enable us to identify your preferences.
+
+Do you use any cookies from third-party companies?
+
+Some cookies, web beacons, and other tracking and storage technologies that we use are from third-party companies (third-party cookies) to provide us with web analytics and intelligence about our sites, which may also be used to provide measurement services and target ads.
+
+How can I control cookies?
+
+You have the right to decide whether to accept or reject cookies. You can exercise your cookie rights by setting your preferences in the Cookie Consent Manager. The Cookie Consent Manager allows you to select which categories of cookies you accept or reject. Essential cookies cannot be rejected as they are strictly necessary to provide you with services.
+
+If you choose to reject cookies, you may still use our website, though your access to some functionality and areas of our website may be restricted. You may also set or amend your web browser controls to accept or refuse cookies. As the means by which you can refuse cookies through your web browser controls vary from browser to browser, you should visit your browser's help menu for more information.
+
+If you want to block future cookies from being placed on your device, you can do so by modifying the settings in our cookie setting center. Nevertheless, please consider that deleting and blocking cookies may impact your user experience.
+
+The specific types of first- and third-party cookies served through our Websites and the purposes they perform are described in the table below (please note that the specific cookies served may vary depending on the specific Online Properties you visit).
+
+| Type                     | Purpose                                                                                  |
+|--------------------------|------------------------------------------------------------------------------------------|
+| Strictly necessary cookies | These are the cookies our website cannot function without. They must be enabled.       |
+| Analytics Cookies        | Enabling these cookies lets us monitor your interactions with our site & make improvements. |
+| Performance Cookies      | These cookies may be used by our marketing partners to send you personalized emails, push notifications, etc. |
+| Support Chat             | If you want to be able to start an online chat with our customer care team, these cookies are essential. |
+| Beacons                  | These are tiny graphic files that contain a unique identifier that enables us to recognize when someone has visited our Websites or opened an email including them. |
+| Flash cookies            | A flash cookie is a text file that is sent by a web server to a client when the browser requests content supported by Adobe Flash. |
+
+What about other tracking technologies, like web beacons?
+
+Cookies are not the only way to recognize or track visitors to a website. We may use other, similar technologies from time to time, like web beacons (sometimes called "tracking pixels" or "clear gifs"). These tiny graphic files contain a unique identifier that enables us to recognize when someone has visited our Websites or opened an email including them. This allows us, for example, to monitor the traffic patterns of users from one page within a website to another, deliver or communicate with cookies, understand whether you have come to the website from an online advertisement displayed on a third-party website, improve site performance, and measure the success of email marketing campaigns. In many instances, these technologies are reliant on cookies to function properly, and so declining cookies will impair their functioning.
+
+Do you use Flash cookies or Local Shared Objects?
+
+Websites may also use so-called "Flash Cookies" (also known as Local Shared Objects or "LSOs") to, among other things, collect and store information about your use of our services, fraud prevention, and for other site operations.
+
+Do you serve targeted advertising?
+
+Third parties may serve cookies on your computer or mobile device to serve advertising through our Websites. These companies may use information about your visits to this and other websites to provide relevant advertisements about goods and services that may interest you. They may also employ technology to measure the effectiveness of advertisements. This can be accomplished by using cookies or web beacons to collect information about your visits to this and other sites to provide relevant advertisements about goods and services of potential interest to you. The information collected through this process does not enable us or them to identify your name, contact details, or other details that directly identify you unless you choose to provide these.
+
+Hopefully, this has clarified things for you and as previously mentioned if there is something that you aren't sure whether you need or not, it's usually safer to leave cookies enabled in case it interacts with one of the features you use on our site.
+
+However, if you are still looking for more information, you can contact us through one of the following contact methods:
+
+Email: support@barnacleai.com

@@ -1,0 +1,67 @@
+{
+  "expo": {
+    "name": "BarnacleAI",
+    "slug": "barnacleAI",
+    "version": "2.0.4",
+    "newArchEnabled": false,
+    "orientation": "portrait",
+    "icon": "./src/imgs/og.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./src/imgs/2sdeew.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#222222"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.dinshpati.barnacleAI",
+      "associatedDomains": [
+        "applinks:barnacleAI.com"
+      ],
+      "googleServicesFile": "./src/auth/GoogleService-Info.plist",
+      "supportsTablet": true,
+      "buildNumber": "2.0.4",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "versionCode": 20,
+      "googleServicesFile": "./src/auth/google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./src/imgs/og.png",
+        "backgroundColor": "#222222"
+      },
+      "package": "com.dinshpati.barnacleAI"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e9b9cc61-452c-42ef-9c0d-fafeb5f394f2"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
+    ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e9b9cc61-452c-42ef-9c0d-fafeb5f394f2"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "160323680559",
+    "project_id": "barnacleai",
+    "storage_bucket": "barnacleai.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:160323680559:android:58fd0355cf6731bece09da",
+        "android_client_info": {
+          "package_name": "com.dinshpati.barnacleAI"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "160323680559-8ssb37lm7oqosv4279t963q2iedduv6m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dinshpati.barnacleAI",
+            "certificate_hash": "87cddfb08c8274bc01737483bbbfa8443381388d"
+          }
+        },
+        {
+          "client_id": "160323680559-2kbs9kq1kktfuupgm9kd1rk22j5tv4ic.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOBEwXoDUZyJ1YbVss3pZ0WSx_VXUBBOk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "160323680559-2kbs9kq1kktfuupgm9kd1rk22j5tv4ic.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "160323680559-qtk6i9uur1lke5s2ee1gebbh9qjer4hi.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.dinshpati.barnacleAI"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
