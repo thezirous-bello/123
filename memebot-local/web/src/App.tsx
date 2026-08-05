@@ -10,8 +10,9 @@ import { TradeHistory } from "./components/TradeHistory.js";
 import { PnLSummary } from "./components/PnLSummary.js";
 import { RiskSettings } from "./components/RiskSettings.js";
 import { LogsPanel } from "./components/LogsPanel.js";
+import { LiveFeed } from "./components/LiveFeed.js";
 
-const TABS = ["Dashboard", "Strategy", "Scanner", "Positions", "History", "Risk", "Logs"] as const;
+const TABS = ["Dashboard", "Live", "Strategy", "Scanner", "Positions", "History", "Risk", "Logs"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function App() {
@@ -61,6 +62,7 @@ export default function App() {
         </div>
       )}
 
+      {tab === "Live" && <LiveFeed running={status?.running ?? false} />}
       {tab === "Strategy" && <StrategyPanel />}
       {tab === "Scanner" && <TokenScanner />}
       {tab === "Positions" && (
