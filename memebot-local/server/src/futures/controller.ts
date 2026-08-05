@@ -143,13 +143,24 @@ async function resolveSymbolUniverse(mode: BybitMode): Promise<string[]> {
   const config = getFuturesStrategyConfig();
   if (config.symbolUniverse === "manual") return config.manualSymbols;
   const tickers = await getAllTickers(mode, CATEGORY);
-  const eligible = tickers.filter((t) => t.turnover24h >= config.min24hTurnoverUsd).sort((a, b) => b.turnover24h - a.turnover24h);
-  // "all" scans every symbol above the liquidity floor (still excludes
-  // literally dead/zero-volume pairs, since those can never produce a real
-  // signal) — "auto" keeps the old top-N-by-volume cap for anyone who wants
-  // a smaller, faster-cycling universe instead.
-  const symbols = config.symbolUniverse === "all" ? eligible : eligible.slice(0, config.autoTopNByVolume);
-  return symbols.map((t) => t.symbol);
+  const usdtPairs = tickers.filter((t) => t.symbol.endsWith("USDT"));
+  if (config.symbolUniverse === "all") {
+    // Every USDT pair Bybit lists for this category/mode — no turnover
+    // pre-filter here. min24hTurnoverUsd is still enforced, just correctly:
+    // as a per-symbol Stage 1 skip-condition (see scanSymbolStage1), which
+    // logs *why* a specific symbol was skipped instead of silently erasing
+    // it from the universe before it's ever looked at. Pre-filtering here
+    // used to double-apply the same threshold and, on testnet (where most
+    // pairs report near-zero fake 24h volume), collapsed "all" down to a
+    // small handful of symbols — the opposite of what "all" means.
+    return usdtPairs.map((t) => t.symbol);
+  }
+  // "auto" is an intentional top-N-by-volume cap for anyone who wants a
+  // smaller, faster-cycling universe instead of scanning everything.
+  return usdtPairs
+    .sort((a, b) => b.turnover24h - a.turnover24h)
+    .slice(0, config.autoTopNByVolume)
+    .map((t) => t.symbol);
 }
 
 async function runSignalScan(mode: BybitMode) {
