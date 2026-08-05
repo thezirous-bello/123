@@ -3,6 +3,9 @@ import { api, type SpotPosition, type SpotSignal, type SpotStatus, type SpotStra
 import { useRefreshSignal } from "../hooks/useRefreshSignal.js";
 import { Panel } from "./Panel.js";
 import { Badge } from "./Badge.js";
+import { BybitWalletCard } from "./BybitWalletCard.js";
+import { NetworkMapPanel } from "./NetworkMapPanel.js";
+import { ALL_BOT_SERVICES, ALL_BOTS_HUB_LABEL, hintForDownProvider } from "./networkMapServices.js";
 
 export function SpotPanel() {
   const tick = useRefreshSignal();
@@ -205,6 +208,10 @@ export function SpotPanel() {
           />
         )}
       </div>
+
+      <BybitWalletCard botLabel="Bybit Spot" wallet={wallet} />
+
+      <NetworkMapPanel title="Network Map — All Bots" hubLabel={ALL_BOTS_HUB_LABEL} services={ALL_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
 
       <Panel
         title="Strategy Config"

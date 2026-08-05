@@ -3,6 +3,9 @@ import { api, type FuturesPosition, type FuturesSignal, type FuturesStatus, type
 import { useRefreshSignal } from "../hooks/useRefreshSignal.js";
 import { Panel } from "./Panel.js";
 import { Badge } from "./Badge.js";
+import { BybitWalletCard } from "./BybitWalletCard.js";
+import { NetworkMapPanel } from "./NetworkMapPanel.js";
+import { ALL_BOT_SERVICES, ALL_BOTS_HUB_LABEL, hintForDownProvider } from "./networkMapServices.js";
 
 export function FuturesPanel() {
   const tick = useRefreshSignal();
@@ -213,6 +216,10 @@ export function FuturesPanel() {
           />
         )}
       </div>
+
+      <BybitWalletCard botLabel="Bybit Futures" wallet={wallet} />
+
+      <NetworkMapPanel title="Network Map — All Bots" hubLabel={ALL_BOTS_HUB_LABEL} services={ALL_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
 
       <Panel
         title="Strategy Config"

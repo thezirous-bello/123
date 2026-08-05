@@ -587,7 +587,7 @@ export interface FuturesTrade {
   created_at: string;
 }
 
-export type ProviderId = "dexscreener" | "solanaRpc" | "jupiter" | "helius";
+export type ProviderId = "dexscreener" | "solanaRpc" | "jupiter" | "helius" | "bybit" | "fearGreed";
 
 export interface ProviderHealth {
   provider: ProviderId;

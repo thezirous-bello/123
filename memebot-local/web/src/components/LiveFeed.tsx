@@ -8,6 +8,7 @@ import { PortfolioOverview } from "./PortfolioOverview.js";
 import { DecisionEnginePanel } from "./DecisionEnginePanel.js";
 import { TokenCardsRow } from "./TokenCardsRow.js";
 import { NetworkMapPanel } from "./NetworkMapPanel.js";
+import { ALL_BOT_SERVICES, ALL_BOTS_HUB_LABEL, hintForDownProvider } from "./networkMapServices.js";
 
 type FlashKind = "scan" | "buy" | "sell";
 interface Flash {
@@ -111,7 +112,21 @@ export function LiveFeed({ running, mode }: { running: boolean; mode: "paper" | 
     <div className="space-y-4">
       <SystemMonitorBar />
 
-      <NetworkMapPanel />
+      <NetworkMapPanel
+        title="Network Map — All Bots"
+        hubLabel={ALL_BOTS_HUB_LABEL}
+        services={ALL_BOT_SERVICES}
+        hintForDownProvider={(id) => hintForDownProvider(id)}
+        action={
+          <button
+            onClick={() => api.discoverTokens().catch(() => {})}
+            className="rounded border border-white/15 px-2 py-1 text-[10px] font-mono text-white/50 hover:bg-white/10"
+            title="Runs a real discovery pass now, same as the Scanner tab's Discover Now button"
+          >
+            DISCOVER NOW
+          </button>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
         <RadarPanel nodes={radarNodes} openMints={openMints} flashes={flashes} running={running} />

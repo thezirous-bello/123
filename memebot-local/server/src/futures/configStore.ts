@@ -10,7 +10,13 @@ export function getFuturesStrategyConfig(): FuturesStrategyConfig {
     saveFuturesStrategyConfig(defaults);
     return defaults;
   }
-  return FuturesStrategyConfigSchema.parse(JSON.parse(row.value));
+  const parsed = FuturesStrategyConfigSchema.parse(JSON.parse(row.value));
+  // See spot/configStore.ts's getSpotStrategyConfig for why this one-time
+  // upgrade exists — same issue, same narrow fix.
+  if (parsed.symbolUniverse === "auto" && parsed.autoTopNByVolume === 30) {
+    return saveFuturesStrategyConfig({ ...parsed, symbolUniverse: "all" });
+  }
+  return parsed;
 }
 
 export function saveFuturesStrategyConfig(config: FuturesStrategyConfig): FuturesStrategyConfig {

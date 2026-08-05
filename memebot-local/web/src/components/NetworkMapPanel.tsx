@@ -3,24 +3,12 @@ import { api, type ProviderHealth, type ProviderId } from "../api/client.js";
 import { useBotEvent } from "../hooks/useRefreshSignal.js";
 import { Panel } from "./Panel.js";
 
-interface ServiceNode {
+export interface ServiceNode {
   id: ProviderId;
   label: string;
   x: number;
   y: number;
 }
-
-// Positions are illustrative layout only — these providers are cloud/CDN
-// services with no single real location, so this is a diagram of the bot's
-// actual call graph and real health, not a claim about physical geography.
-const SERVICES: ServiceNode[] = [
-  { id: "dexscreener", label: "DEXSCREENER", x: 660, y: 80 },
-  { id: "solanaRpc", label: "SOLANA RPC", x: 700, y: 230 },
-  { id: "jupiter", label: "JUPITER", x: 660, y: 380 },
-  { id: "helius", label: "HELIUS (optional)", x: 90, y: 380 },
-];
-
-const LOCAL = { x: 350, y: 230 };
 
 type Status = "unused" | "healthy" | "degraded" | "down";
 
@@ -51,7 +39,25 @@ function curvePath(from: { x: number; y: number }, to: { x: number; y: number })
   return `M${from.x},${from.y} Q${midX + offsetX},${midY + offsetY} ${to.x},${to.y}`;
 }
 
-export function NetworkMapPanel() {
+const LOCAL = { x: 350, y: 230 };
+
+export interface NetworkMapPanelProps {
+  title?: string;
+  hubLabel: string;
+  services: ServiceNode[];
+  action?: React.ReactNode;
+  /** Returns an extra hint appended to the red down-provider banner (e.g.
+   * "try a different RPC URL"), or null/undefined for no extra hint. */
+  hintForDownProvider?: (providerId: ProviderId, health: ProviderHealth) => string | null | undefined;
+}
+
+/** Real call-graph + live provider health, reused by the meme-coin bot (its
+ * own DexScreener/Solana RPC/Jupiter/Helius calls) and the Bybit spot/
+ * futures bots (their own Bybit + Fear&Greed calls) — same component, a
+ * different service list and hub label per caller. Node positions are
+ * illustrative layout only, not geodata: these are cloud/CDN services with
+ * no single real location. */
+export function NetworkMapPanel({ title = "Network Map", hubLabel, services, action, hintForDownProvider }: NetworkMapPanelProps) {
   const [health, setHealth] = useState<Record<string, ProviderHealth>>({});
   const [pulses, setPulses] = useState<Record<string, number>>({});
   const pulseCounter = useRef(0);
@@ -73,27 +79,20 @@ export function NetworkMapPanel() {
     }, 1100);
   });
 
+  const relevantHealth = useMemo(() => {
+    const ids = new Set(services.map((s) => s.id));
+    return Object.values(health).filter((h) => ids.has(h.provider));
+  }, [health, services]);
+
   const stats = useMemo(() => {
-    const rows = Object.values(health);
-    const totalCalls = rows.reduce((s, r) => s + r.totalCalls, 0);
-    const totalFailures = rows.reduce((s, r) => s + r.totalFailures, 0);
-    const down = rows.filter((r) => statusOf(r) === "down").length;
+    const totalCalls = relevantHealth.reduce((s, r) => s + r.totalCalls, 0);
+    const totalFailures = relevantHealth.reduce((s, r) => s + r.totalFailures, 0);
+    const down = relevantHealth.filter((r) => statusOf(r) === "down").length;
     return { totalCalls, totalFailures, down };
-  }, [health]);
+  }, [relevantHealth]);
 
   return (
-    <Panel
-      title="Network Map"
-      action={
-        <button
-          onClick={() => api.discoverTokens().catch(() => {})}
-          className="rounded border border-white/15 px-2 py-1 text-[10px] font-mono text-white/50 hover:bg-white/10"
-          title="Runs a real discovery pass now, same as the Scanner tab's Discover Now button"
-        >
-          DISCOVER NOW
-        </button>
-      }
-    >
+    <Panel title={title} action={action}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-white/40">
         <span>Real call graph + live provider health — node positions are illustrative, not geodata.</span>
         <span className="flex gap-3">
@@ -111,20 +110,18 @@ export function NetworkMapPanel() {
 
       {stats.down > 0 && (
         <p className="mb-2 rounded border border-red-500/30 bg-red-500/5 px-2 py-1 text-[11px] text-red-300">
-          {Object.values(health)
+          {relevantHealth
             .filter((h) => statusOf(h) === "down")
-            .map((h) => `${h.provider}: ${h.lastError ?? "failing"}`)
+            .map((h) => `${h.provider}: ${h.lastError ?? "failing"}${hintForDownProvider ? ` — ${hintForDownProvider(h.provider, h) ?? ""}` : ""}`)
             .join(" · ")}
-          {" — this will block trades. "}
-          {Object.values(health).some((h) => statusOf(h) === "down" && h.provider === "solanaRpc") &&
-            "Try a free Helius RPC URL in .env (SOLANA_RPC_URL) — the public RPC rate-limits easily."}
+          {" — this will block trades."}
         </p>
       )}
 
       <svg viewBox="0 0 760 440" className="w-full">
         <WorldBackdrop />
 
-        {SERVICES.map((service) => {
+        {services.map((service) => {
           const status = statusOf(health[service.id]);
           const active = !!pulses[service.id];
           return (
@@ -144,10 +141,10 @@ export function NetworkMapPanel() {
         <circle cx={LOCAL.x} cy={LOCAL.y} r={16} fill="#a78bfa" fillOpacity={0.18} />
         <circle cx={LOCAL.x} cy={LOCAL.y} r={7} fill="#a78bfa" style={{ filter: "drop-shadow(0 0 6px #a78bfa)" }} />
         <text x={LOCAL.x} y={LOCAL.y + 40} textAnchor="middle" className="fill-white/70" style={{ fontSize: 11, fontFamily: "monospace" }}>
-          MEMEBOT (LOCAL)
+          {hubLabel}
         </text>
 
-        {SERVICES.map((service) => {
+        {services.map((service) => {
           const h = health[service.id];
           const status = statusOf(h);
           const color = STATUS_COLOR[status];

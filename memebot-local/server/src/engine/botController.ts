@@ -181,10 +181,40 @@ export async function runAutoDiscovery(): Promise<{ added: number; candidates: n
   return { added, candidates: candidates.length, evicted };
 }
 
-async function maybeRunAutoDiscovery() {
+/**
+ * Whether there's enough free (uncommitted) balance to actually act on a
+ * fresh discovery — no point spending a DexScreener call to find more
+ * candidates when every dollar is already tied up in open positions. Uses
+ * the active strategy's own trade size as the bar, since that's what a
+ * real buy would need.
+ */
+async function hasBalanceForNewTrade(mode: Mode): Promise<boolean> {
+  const strategy = getActiveStrategy();
+  const minTradeUsd = strategy?.rules.maxTradeUsd ?? 0;
+  if (minTradeUsd <= 0) return true; // no strategy configured yet — that's a different problem, don't block discovery on it
+
+  if (mode === "paper") {
+    return getPaperAccount().cashBalanceUsd.gte(minTradeUsd);
+  }
+
+  const limits = getRiskLimits();
+  const solBalance = await getSolBalance();
+  const solPrice = await estimateSolUsdPriceOrOne("SOL");
+  const spendableSol = solBalance.minus(limits.minimumSolReserve);
+  const spendableUsd = spendableSol.gt(0) ? spendableSol.times(solPrice) : new Decimal(0);
+  return spendableUsd.gte(minTradeUsd);
+}
+
+async function maybeRunAutoDiscovery(mode: Mode) {
   const now = Date.now();
   if (now - lastDiscoveryAtMs < DISCOVERY_INTERVAL_MS) return;
   lastDiscoveryAtMs = now;
+
+  if (!(await hasBalanceForNewTrade(mode))) {
+    recordLog("debug", "discovery", "Skipping discovery — no free balance for a new trade right now (checks again in a few minutes, or right after a sell).");
+    return;
+  }
+
   try {
     await runAutoDiscovery();
   } catch (err) {
@@ -194,7 +224,7 @@ async function maybeRunAutoDiscovery() {
 
 async function tick(mode: Mode) {
   tickCounter += 1;
-  await maybeRunAutoDiscovery();
+  await maybeRunAutoDiscovery(mode);
   await manageOpenPositions(mode);
 
   if (isEmergencyStopped()) return; // monitoring continues above; no new entries below
@@ -273,6 +303,10 @@ async function executeExit(mode: Mode, position: Position, sellAmount: Decimal, 
     recordLog("warn", "position", `Exit (${reason}) failed for ${position.symbol ?? position.mint}: ${result.reasons.join("; ")}`, {
       positionId: position.id,
     });
+  } else {
+    // A sell just freed up balance — don't make discovery wait out the
+    // rest of the 3-minute timer to notice.
+    lastDiscoveryAtMs = 0;
   }
 }
 
@@ -446,6 +480,8 @@ export async function manualSell(positionId: string, percentageOfRemaining: numb
     recordLog("warn", "position", `Manual sell failed for ${position.symbol ?? position.mint}: ${result.reasons.join("; ")}`, {
       positionId,
     });
+  } else {
+    lastDiscoveryAtMs = 0;
   }
   return { ok: result.ok, reasons: result.reasons };
 }
