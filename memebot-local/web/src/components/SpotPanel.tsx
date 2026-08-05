@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
-import { api, type FuturesPosition, type FuturesSignal, type FuturesStatus, type FuturesStrategyConfig, type FuturesTrade, type FuturesWallet } from "../api/client.js";
+import { api, type SpotPosition, type SpotSignal, type SpotStatus, type SpotStrategyConfig, type SpotTrade, type SpotWallet } from "../api/client.js";
 import { useRefreshSignal } from "../hooks/useRefreshSignal.js";
 import { Panel } from "./Panel.js";
 import { Badge } from "./Badge.js";
 
-export function FuturesPanel() {
+export function SpotPanel() {
   const tick = useRefreshSignal();
-  const [status, setStatus] = useState<FuturesStatus | null>(null);
-  const [wallet, setWallet] = useState<FuturesWallet | null>(null);
-  const [config, setConfig] = useState<FuturesStrategyConfig | null>(null);
-  const [signals, setSignals] = useState<FuturesSignal[]>([]);
-  const [positions, setPositions] = useState<FuturesPosition[]>([]);
-  const [trades, setTrades] = useState<FuturesTrade[]>([]);
+  const [status, setStatus] = useState<SpotStatus | null>(null);
+  const [wallet, setWallet] = useState<SpotWallet | null>(null);
+  const [config, setConfig] = useState<SpotStrategyConfig | null>(null);
+  const [signals, setSignals] = useState<SpotSignal[]>([]);
+  const [positions, setPositions] = useState<SpotPosition[]>([]);
+  const [trades, setTrades] = useState<SpotTrade[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showModeConfirm, setShowModeConfirm] = useState(false);
@@ -20,16 +20,16 @@ export function FuturesPanel() {
   const [showConfig, setShowConfig] = useState(false);
 
   function refresh() {
-    api.futuresStatus().then(setStatus).catch(() => {});
-    api.futuresConfig().then(setConfig).catch(() => {});
-    api.futuresSignals().then(setSignals).catch(() => {});
-    api.futuresPositions().then(setPositions).catch(() => {});
-    api.futuresTrades().then(setTrades).catch(() => {});
+    api.spotStatus().then(setStatus).catch(() => {});
+    api.spotConfig().then(setConfig).catch(() => {});
+    api.spotSignals().then(setSignals).catch(() => {});
+    api.spotPositions().then(setPositions).catch(() => {});
+    api.spotTrades().then(setTrades).catch(() => {});
   }
 
   useEffect(refresh, [tick]);
   useEffect(() => {
-    if (status) api.futuresWallet(status.mode).then(setWallet).catch(() => {});
+    if (status) api.spotWallet(status.mode).then(setWallet).catch(() => {});
   }, [status?.mode, tick]);
 
   async function run(fn: () => Promise<unknown>) {
@@ -47,7 +47,7 @@ export function FuturesPanel() {
 
   if (!status || !config) {
     return (
-      <Panel title="Bybit Futures Bot">
+      <Panel title="Bybit Spot Bot">
         <p className="text-sm text-white/40">Loading…</p>
       </Panel>
     );
@@ -58,11 +58,6 @@ export function FuturesPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
-        Intentionally HIGH RISK: {config.minPositionSizePct}-{config.maxPositionSizePct}% of account balance per trade at {config.minLeverage}x-{config.maxLeverage}x leverage,
-        both LONG and SHORT. A handful of losing trades at this size/leverage can do serious damage — this is not a conservative strategy.
-      </div>
-
       <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-[#131318] p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={status.running ? "good" : "neutral"}>{status.running ? "RUNNING" : "STOPPED"}</Badge>
@@ -78,24 +73,24 @@ export function FuturesPanel() {
           {!status.running ? (
             <button
               disabled={busy || status.emergencyStopped}
-              onClick={() => run(() => api.futuresStart())}
+              onClick={() => run(() => api.spotStart())}
               className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
             >
-              Start Futures Bot
+              Start Spot Bot
             </button>
           ) : (
             <button
               disabled={busy}
-              onClick={() => run(() => api.futuresStop())}
+              onClick={() => run(() => api.spotStop())}
               className="rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-40"
             >
-              Stop Futures Bot
+              Stop Spot Bot
             </button>
           )}
 
           <button
             disabled={busy}
-            onClick={() => run(() => api.updateFuturesConfig({ enabled: !config.enabled }))}
+            onClick={() => run(() => api.updateSpotConfig({ enabled: !config.enabled }))}
             className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
           >
             {config.enabled ? "Disable Strategy" : "Enable Strategy"}
@@ -107,12 +102,12 @@ export function FuturesPanel() {
               onClick={() => setShowModeConfirm(true)}
               className="rounded-lg border border-red-500/40 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-40"
             >
-              Request Live (Mainnet) Trading
+              Request Live (Mainnet) Spot Trading
             </button>
           ) : (
             <button
               disabled={busy}
-              onClick={() => run(() => api.futuresSetMode("testnet", true))}
+              onClick={() => run(() => api.spotSetMode("testnet", true))}
               className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
             >
               Switch to Testnet
@@ -122,7 +117,7 @@ export function FuturesPanel() {
           {status.emergencyStopped ? (
             <button
               disabled={busy}
-              onClick={() => run(() => api.futuresResume())}
+              onClick={() => run(() => api.spotResume())}
               className="ml-auto rounded-lg bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/30 disabled:opacity-40"
             >
               Resume From Emergency Stop
@@ -155,21 +150,18 @@ export function FuturesPanel() {
 
         {showModeConfirm && (
           <ConfirmModal
-            title="Enable live (mainnet) futures trading?"
+            title="Enable live (mainnet) spot trading?"
             danger
             body={
               <div className="space-y-2 text-sm text-white/80">
-                <p>
-                  This switches the futures bot to LIVE mode. Real leveraged orders ({config.minLeverage}x-{config.maxLeverage}x, {config.minPositionSizePct}-
-                  {config.maxPositionSizePct}% of balance per trade) will be placed on Bybit mainnet with your real balance, in either direction (long or short).
-                </p>
+                <p>This switches the spot bot to LIVE mode. Real spot buy orders will be placed on Bybit mainnet with your real balance.</p>
                 <ul className="list-disc space-y-1 pl-5 text-white/60">
-                  <li>At this leverage a routine adverse move can liquidate a position — the stop-loss is not a guarantee it fires first.</li>
-                  <li>Position sizes this large mean a losing streak can do serious damage very quickly.</li>
-                  <li>Only fund this account with money you can afford to lose entirely.</li>
+                  <li>Spot coins can lose value quickly — a stop-loss can still fill below its intended price in fast markets.</li>
+                  <li>No leverage here, but the full position is still real money at risk, not virtual.</li>
+                  <li>Only fund this account with money you can afford to lose.</li>
                 </ul>
                 {!status.liveTradingAllowedByConfig && (
-                  <p className="font-semibold text-red-300">Blocked: the server .env has FUTURES_LIVE_TRADING_ENABLED=false.</p>
+                  <p className="font-semibold text-red-300">Blocked: the server .env has SPOT_LIVE_TRADING_ENABLED=false.</p>
                 )}
               </div>
             }
@@ -177,7 +169,7 @@ export function FuturesPanel() {
             onCancel={() => setShowModeConfirm(false)}
             onConfirm={() =>
               run(async () => {
-                await api.futuresSetMode("live", true);
+                await api.spotSetMode("live", true);
                 setShowModeConfirm(false);
               })
             }
@@ -186,11 +178,11 @@ export function FuturesPanel() {
 
         {showEmergencyConfirm && (
           <ConfirmModal
-            title="Trigger futures emergency stop?"
+            title="Trigger spot emergency stop?"
             danger
             body={
               <div className="space-y-2 text-sm text-white/80">
-                <p>This immediately stops the futures bot and blocks all new signals/entries. Open positions stay open — close them manually below if needed.</p>
+                <p>This immediately stops the spot bot and blocks all new signals/entries. Open positions stay open — close them manually below if needed.</p>
                 <label className="block text-xs uppercase tracking-wide text-white/50">Reason (recorded in the audit log)</label>
                 <input
                   autoFocus
@@ -205,7 +197,7 @@ export function FuturesPanel() {
             onCancel={() => setShowEmergencyConfirm(false)}
             onConfirm={() =>
               run(async () => {
-                await api.futuresEmergencyStop(emergencyReason || "No reason given.");
+                await api.spotEmergencyStop(emergencyReason || "No reason given.");
                 setShowEmergencyConfirm(false);
                 setEmergencyReason("");
               })
@@ -224,19 +216,18 @@ export function FuturesPanel() {
       >
         {!showConfig ? (
           <p className="font-mono text-xs text-white/50">
-            {config.symbolUniverse === "auto" ? `Auto-scanning top ${config.autoTopNByVolume} symbols by 24h volume` : `${config.manualSymbols.length} manual symbol(s)`} · LONG &
-            SHORT · leverage {config.minLeverage}x-{config.maxLeverage}x by confidence · size {config.minPositionSizePct}-{config.maxPositionSizePct}% of balance · max{" "}
-            {config.maxActiveTrades} active, {config.maxPendingSignals} pending · daily loss limit {config.dailyMaxLossPct}% · halt after {config.stopAfterConsecutiveLosses}{" "}
-            losses
+            {config.symbolUniverse === "auto" ? `Auto-scanning top ${config.autoTopNByVolume} symbols by 24h volume` : `${config.manualSymbols.length} manual symbol(s)`} · risk{" "}
+            {config.riskPerTradePct}%/trade · max {config.maxActiveTrades} active, {config.maxPendingSignals} pending · daily loss
+            limit {config.dailyMaxLossPct}% · halt after {config.stopAfterConsecutiveLosses} losses
           </p>
         ) : (
-          <ConfigEditor config={config} busy={busy} onSave={(patch) => run(() => api.updateFuturesConfig(patch))} />
+          <ConfigEditor config={config} busy={busy} onSave={(patch) => run(() => api.updateSpotConfig(patch))} />
         )}
       </Panel>
 
       <Panel title={`Signals (${signals.filter((s) => s.status === "pending" || s.status === "active").length} pending/active)`}>
         {signals.length === 0 ? (
-          <p className="text-sm text-white/40">No signals yet — the bot scans every ~3 minutes once the strategy is enabled and running, looking for the single best LONG or SHORT setup.</p>
+          <p className="text-sm text-white/40">No signals yet — the bot scans every ~3 minutes once the strategy is enabled and running.</p>
         ) : (
           <div className="space-y-1.5">
             {signals.slice(0, 20).map((s) => (
@@ -248,11 +239,11 @@ export function FuturesPanel() {
 
       <Panel title={`Open Positions (${openPositions.length})`}>
         {openPositions.length === 0 ? (
-          <p className="text-sm text-white/40">No open futures positions.</p>
+          <p className="text-sm text-white/40">No open spot positions.</p>
         ) : (
           <div className="space-y-2">
             {openPositions.map((p) => (
-              <PositionRow key={p.id} position={p} onClose={() => run(() => api.closeFuturesPosition(p.id))} busy={busy} />
+              <PositionRow key={p.id} position={p} onClose={() => run(() => api.closeSpotPosition(p.id))} busy={busy} />
             ))}
           </div>
         )}
@@ -308,42 +299,32 @@ export function FuturesPanel() {
   );
 }
 
-function confidenceTone(confidence: "low" | "medium" | "high"): "warn" | "accent" | "good" {
-  if (confidence === "high") return "good";
-  if (confidence === "medium") return "accent";
-  return "warn";
-}
-
-function SignalRow({ signal }: { signal: FuturesSignal }) {
+function SignalRow({ signal }: { signal: SpotSignal }) {
   const tone = signal.status === "filled" ? "good" : signal.status === "cancelled" || signal.status === "expired" ? "danger" : "accent";
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/5 bg-black/20 px-3 py-2 font-mono text-xs">
       <Badge tone={tone}>{signal.status.toUpperCase()}</Badge>
-      <Badge tone={signal.side === "long" ? "good" : "danger"}>{signal.side.toUpperCase()}</Badge>
       <span className="font-semibold text-white/80">{signal.symbol}</span>
+      <span className="text-white/50">{signal.side}</span>
       <span className="text-white/50">entry ${signal.entryPrice}</span>
       <span className="text-white/50">sl ${signal.stopLoss}</span>
       <span className="text-white/50">score {Number(signal.score).toFixed(1)}</span>
-      <Badge tone={confidenceTone(signal.confidence)}>{signal.confidence.toUpperCase()} · {signal.leverage}x · {Number(signal.positionSizePct).toFixed(0)}%</Badge>
       {signal.cancelledReason && <span className="text-red-300">{signal.cancelledReason}</span>}
       <span className="ml-auto text-white/30">{new Date(signal.createdAt).toLocaleTimeString()}</span>
     </div>
   );
 }
 
-function PositionRow({ position, onClose, busy }: { position: FuturesPosition; onClose?: () => void; busy?: boolean }) {
+function PositionRow({ position, onClose, busy }: { position: SpotPosition; onClose?: () => void; busy?: boolean }) {
   const pnl = Number(position.realizedPnlUsd);
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/5 bg-black/20 px-3 py-2 font-mono text-xs">
-      <Badge tone={position.side === "long" ? "good" : "danger"}>{position.side.toUpperCase()}</Badge>
+      <Badge tone="good">LONG</Badge>
       <span className="font-semibold text-white/80">{position.symbol}</span>
-      <span className="text-white/50">{position.leverage}x</span>
-      <Badge tone={confidenceTone(position.confidence)}>{position.confidence.toUpperCase()}</Badge>
       <Badge tone={position.mode === "live" ? "danger" : "accent"}>{position.mode}</Badge>
       <span className="text-white/50">qty {position.remainingQty}</span>
       <span className="text-white/50">entry ${position.entryPrice}</span>
       <span className="text-white/50">sl ${position.stopLoss}</span>
-      <span className="text-white/50">margin ${Number(position.marginUsd).toFixed(2)}</span>
       {position.trailingActive && <Badge tone="accent">TRAILING ${position.trailingStopPrice}</Badge>}
       <span className={pnl >= 0 ? "text-emerald-300" : "text-red-300"}>${pnl.toFixed(2)}</span>
       {position.closeReason && <span className="text-white/40">({position.closeReason})</span>}
@@ -360,12 +341,12 @@ function PositionRow({ position, onClose, busy }: { position: FuturesPosition; o
   );
 }
 
-function ConfigEditor({ config, busy, onSave }: { config: FuturesStrategyConfig; busy: boolean; onSave: (patch: Partial<FuturesStrategyConfig>) => void }) {
+function ConfigEditor({ config, busy, onSave }: { config: SpotStrategyConfig; busy: boolean; onSave: (patch: Partial<SpotStrategyConfig>) => void }) {
   const [draft, setDraft] = useState(config);
 
   useEffect(() => setDraft(config), [config]);
 
-  function field<K extends keyof FuturesStrategyConfig>(key: K, label: string, step = 0.01) {
+  function field<K extends keyof SpotStrategyConfig>(key: K, label: string, step = 0.01) {
     const value = draft[key];
     return (
       <label key={key} className="flex flex-col gap-1">
@@ -407,36 +388,20 @@ function ConfigEditor({ config, busy, onSave }: { config: FuturesStrategyConfig;
       </div>
 
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">Shared Stage 1 filters</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">Stage 1 — signal generation</h4>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {field("atrOverCloseMax", "Max ATR/Close")}
-          {field("maxSpreadPct", "Max spread %")}
+          {field("stddev30Max", "Max 30p StdDev")}
+          {field("latestRangeAtrMultMax", "Max range/ATR")}
           {field("min24hTurnoverUsd", "Min 24h turnover $", 100000)}
-          {field("entryZoneNearPct", "Entry zone near %")}
-          {field("entryZoneFarPct", "Entry zone far %")}
+          {field("volumeSpikeMultiplier", "Volume spike x")}
+          {field("maxSpreadPct", "Max spread %")}
+          {field("stochRsiKMax", "Max StochRSI K", 1)}
+          {field("rsiMin", "Min RSI", 1)}
+          {field("rsiMax", "Max RSI", 1)}
           {field("slAtrMultiplier", "SL ATR mult")}
           {field("maxStopLossDistancePct", "Max SL distance %")}
           {field("minRiskReward", "Min risk:reward")}
-        </div>
-      </div>
-
-      <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">LONG setup</h4>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {field("stochRsiLongKMax", "Max StochRSI K", 1)}
-          {field("rsiLongMin", "Min RSI", 1)}
-          {field("rsiLongMax", "Max RSI", 1)}
-          {field("fundingLongMaxPct", "Max funding rate %")}
-        </div>
-      </div>
-
-      <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">SHORT setup</h4>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {field("stochRsiShortKMin", "Min StochRSI K", 1)}
-          {field("rsiShortMin", "Min RSI", 1)}
-          {field("rsiShortMax", "Max RSI", 1)}
-          {field("fundingShortMinPct", "Min funding rate %")}
         </div>
       </div>
 
@@ -445,34 +410,17 @@ function ConfigEditor({ config, busy, onSave }: { config: FuturesStrategyConfig;
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {field("maxPendingSignals", "Max pending signals", 1)}
           {field("maxActiveTrades", "Max active trades", 1)}
-          {field("fearGreedLongPreferAbove", "F&G long prefer above", 1)}
-          {field("fearGreedShortPreferBelow", "F&G short prefer below", 1)}
+          {field("fearGreedRejectBelow", "F&G reject below", 1)}
+          {field("fearGreedReduceSizeAbove", "F&G reduce size above", 1)}
           {field("entryPriceMaxDriftPct", "Max entry drift %")}
           {field("signalExpiryMinutes", "Signal expiry (min)", 1)}
         </div>
       </div>
 
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">Confidence → leverage / position size (HIGH RISK)</h4>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {field("confidenceHighScoreMin", "High confidence score ≥")}
-          {field("confidenceMediumScoreMin", "Medium confidence score ≥")}
-          {field("minLeverage", "Min leverage", 1)}
-          {field("maxLeverage", "Max leverage", 1)}
-          {field("leverageLowConfidence", "Leverage @ low conf.", 1)}
-          {field("leverageMediumConfidence", "Leverage @ medium conf.", 1)}
-          {field("leverageHighConfidence", "Leverage @ high conf.", 1)}
-          {field("minPositionSizePct", "Min size % of balance")}
-          {field("maxPositionSizePct", "Max size % of balance")}
-          {field("positionSizeLowConfidencePct", "Size % @ low conf.")}
-          {field("positionSizeMediumConfidencePct", "Size % @ medium conf.")}
-          {field("positionSizeHighConfidencePct", "Size % @ high conf.")}
-        </div>
-      </div>
-
-      <div>
         <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">Trade management</h4>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {field("riskPerTradePct", "Risk % / trade")}
           {field("tp1ClosePct", "TP1 close %", 1)}
           {field("tp2ClosePct", "TP2 close %", 1)}
           {field("trailingAtrMultiplier", "Trailing ATR mult")}

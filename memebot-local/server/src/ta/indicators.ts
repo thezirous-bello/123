@@ -241,6 +241,45 @@ export function isBullishConfirmationCandle(candle: Candle): boolean {
   return candle.close > candle.open && candle.close >= mid;
 }
 
+/** A "bearish confirmation candle": mirror of the bullish check — closes
+ * red and below its own midpoint, i.e. sellers controlled the close. */
+export function isBearishConfirmationCandle(candle: Candle): boolean {
+  const mid = (candle.high + candle.low) / 2;
+  return candle.close < candle.open && candle.close <= mid;
+}
+
+/** True if price is above its 200 EMA, or has just crossed above it
+ * (reclaiming) within the last `lookback` candles. */
+export function isAboveOrReclaiming200Ema(closes: number[], ema200: number[], lookback = 5): boolean {
+  const lastClose = last(closes);
+  const lastEma = last(ema200);
+  if (lastClose === undefined || lastEma === undefined || Number.isNaN(lastEma)) return false;
+  if (lastClose > lastEma) return true;
+  for (let i = closes.length - lookback; i < closes.length - 1; i++) {
+    const c = closes[i];
+    const e = ema200[i];
+    if (c === undefined || e === undefined || Number.isNaN(e)) continue;
+    if (c < e && lastClose >= lastEma) return true;
+  }
+  return false;
+}
+
+/** True if price is below its 200 EMA, or has just crossed below it
+ * (rejecting) within the last `lookback` candles. */
+export function isBelowOrRejecting200Ema(closes: number[], ema200: number[], lookback = 5): boolean {
+  const lastClose = last(closes);
+  const lastEma = last(ema200);
+  if (lastClose === undefined || lastEma === undefined || Number.isNaN(lastEma)) return false;
+  if (lastClose < lastEma) return true;
+  for (let i = closes.length - lookback; i < closes.length - 1; i++) {
+    const c = closes[i];
+    const e = ema200[i];
+    if (c === undefined || e === undefined || Number.isNaN(e)) continue;
+    if (c > e && lastClose <= lastEma) return true;
+  }
+  return false;
+}
+
 export function last<T>(values: T[]): T | undefined {
   return values[values.length - 1];
 }

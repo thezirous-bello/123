@@ -1,13 +1,18 @@
 import { bybitGetPrivate, bybitPostPrivate, type BybitMode } from "./client.js";
-
-const CATEGORY = "linear" as const;
+import type { BybitCategory } from "./marketData.js";
 
 export type OrderSide = "Buy" | "Sell";
 
 export interface SubmitOrderParams {
+  category: BybitCategory;
   symbol: string;
   side: OrderSide;
   qty: string;
+  // Spot market Buy orders only: whether `qty` is a quote-currency amount
+  // (e.g. USDT to spend) or a base-coin amount. Bybit's own docs recommend
+  // quoteCoin for buys since it's exact regardless of price movement between
+  // quote and fill — not applicable to linear (futures) or to sells.
+  marketUnit?: "baseCoin" | "quoteCoin";
   reduceOnly?: boolean;
   orderLinkId?: string;
 }
@@ -19,17 +24,19 @@ export interface OrderResult {
 
 /** Market order only — this bot never uses limit entries, matching the
  * strategy's "enter now within the zone" behavior. positionIdx=0 is
- * one-way mode (not hedge mode), which is what a fresh Bybit account uses
- * by default and what setLeverage below assumes. */
+ * one-way mode (not hedge mode, linear-only field — ignored by spot), which
+ * is what a fresh Bybit account uses by default and what setLeverage below
+ * assumes. */
 export async function submitMarketOrder(mode: BybitMode, params: SubmitOrderParams): Promise<OrderResult> {
   return bybitPostPrivate<OrderResult>(mode, "/v5/order/create", {
-    category: CATEGORY,
+    category: params.category,
     symbol: params.symbol,
     side: params.side,
     orderType: "Market",
     qty: params.qty,
-    reduceOnly: params.reduceOnly ?? false,
-    positionIdx: 0,
+    marketUnit: params.marketUnit,
+    reduceOnly: params.category === "linear" ? (params.reduceOnly ?? false) : undefined,
+    positionIdx: params.category === "linear" ? 0 : undefined,
     orderLinkId: params.orderLinkId,
   });
 }
@@ -64,7 +71,7 @@ interface PositionListResult {
 }
 
 export async function getOpenPositions(mode: BybitMode, symbol?: string): Promise<PositionInfo[]> {
-  const params: Record<string, unknown> = { category: CATEGORY, settleCoin: "USDT" };
+  const params: Record<string, unknown> = { category: "linear", settleCoin: "USDT" };
   if (symbol) params.symbol = symbol;
   const result = await bybitGetPrivate<PositionListResult>(mode, "/v5/position/list", params);
   return result.list
@@ -84,7 +91,7 @@ export async function getOpenPositions(mode: BybitMode, symbol?: string): Promis
 
 export async function setLeverage(mode: BybitMode, symbol: string, leverage: number): Promise<void> {
   await bybitPostPrivate(mode, "/v5/position/set-leverage", {
-    category: CATEGORY,
+    category: "linear",
     symbol,
     buyLeverage: String(leverage),
     sellLeverage: String(leverage),
@@ -103,7 +110,7 @@ export interface SetTradingStopParams {
  * this is the backstop. positionIdx=0 matches submitMarketOrder above. */
 export async function setTradingStop(mode: BybitMode, params: SetTradingStopParams): Promise<void> {
   await bybitPostPrivate(mode, "/v5/position/trading-stop", {
-    category: CATEGORY,
+    category: "linear",
     symbol: params.symbol,
     stopLoss: params.stopLoss,
     takeProfit: params.takeProfit,

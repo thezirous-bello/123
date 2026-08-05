@@ -22,10 +22,19 @@ function check(name: string, passed: boolean, detail: string): FuturesRiskCheck 
   return { name, passed, detail };
 }
 
+// A very rough liquidation-distance estimate (ignoring maintenance margin,
+// fees, and funding) — entry moving against the position by 1/leverage
+// wipes the margin. This strategy's own max stop-loss distance (3%) gets
+// uncomfortably close to that at 30x (~3.33%), so this isn't a formality:
+// it's the one thing standing between "stop-loss triggers" and
+// "position gets liquidated before the stop-loss can fire."
+const LIQUIDATION_SAFETY_FACTOR = 0.7; // stop must trigger within 70% of the naive liquidation distance
+
 export interface FuturesEntryRiskInput {
   mode: BybitMode;
   leverage: number;
   maxInstrumentLeverage: number;
+  stopLossDistancePct: number; // as a percentage, e.g. 3 for 3%
   marginUsd: Decimal;
   availableBalanceUsd: Decimal;
   accountEquityUsd: Decimal;
@@ -34,8 +43,8 @@ export interface FuturesEntryRiskInput {
 
 /** The single gate every futures entry must pass, mirroring the meme-coin
  * bot's assessEntryRisk in structure and intent — same "block by default,
- * log every reason" philosophy, adapted for leverage/margin instead of a
- * flat trade-size cap. */
+ * log every reason" philosophy, adapted for leverage/margin and this
+ * strategy's much higher risk profile. */
 export function assessFuturesEntryRisk(input: FuturesEntryRiskInput): FuturesRiskAssessment {
   const checks: FuturesRiskCheck[] = [];
   const state = getFuturesBotState();
@@ -65,9 +74,18 @@ export function assessFuturesEntryRisk(input: FuturesEntryRiskInput): FuturesRis
 
   checks.push(
     check(
-      "leverage_cap",
-      input.leverage <= input.config.maxLeverage && input.leverage <= input.maxInstrumentLeverage,
-      `Leverage ${input.leverage}x must be <= configured max ${input.config.maxLeverage}x and <= instrument max ${input.maxInstrumentLeverage}x.`,
+      "leverage_bounds",
+      input.leverage >= input.config.minLeverage && input.leverage <= input.config.maxLeverage && input.leverage <= input.maxInstrumentLeverage,
+      `Leverage ${input.leverage}x must be within [${input.config.minLeverage}x, ${input.config.maxLeverage}x] and <= instrument max ${input.maxInstrumentLeverage}x.`,
+    ),
+  );
+
+  const naiveLiquidationDistancePct = (1 / input.leverage) * 100;
+  checks.push(
+    check(
+      "liquidation_safety_buffer",
+      input.stopLossDistancePct <= naiveLiquidationDistancePct * LIQUIDATION_SAFETY_FACTOR,
+      `Stop-loss distance ${input.stopLossDistancePct.toFixed(2)}% must be <= ${(naiveLiquidationDistancePct * LIQUIDATION_SAFETY_FACTOR).toFixed(2)}% (${LIQUIDATION_SAFETY_FACTOR * 100}% of the ~${naiveLiquidationDistancePct.toFixed(2)}% naive liquidation distance at ${input.leverage}x) — otherwise liquidation could hit before the stop-loss does.`,
     ),
   );
 
@@ -115,28 +133,24 @@ export function assessFuturesEntryRisk(input: FuturesEntryRiskInput): FuturesRis
   return { approved, checks, blockingReasons };
 }
 
-/** Position sizing from the strategy's own rule: risk `riskPerTradePct`% of
- * account equity on the distance to stop-loss, then derive qty/notional/
- * margin from that and the chosen leverage. `sizeMultiplier` comes from
- * Stage 2's Fear & Greed check (reduces size instead of blocking above 80). */
+/** Position sizing straight from the strategy's own rule: a flat
+ * percentage of account equity (20-50%, tiered by confidence) goes to
+ * notional exposure, then leverage determines how much margin that
+ * actually costs. This is deliberately NOT risk-based sizing (unlike the
+ * spot/meme bots) — the strategy explicitly specifies size as a % of
+ * balance, not a % risked to stop-loss. */
 export function computeFuturesPositionSize(params: {
   equityUsd: Decimal;
   entryPrice: Decimal;
-  stopLoss: Decimal;
-  riskPerTradePct: number;
+  positionSizePct: number;
   leverage: number;
-  sizeMultiplier: number;
   qtyStep: number;
-}): { qty: Decimal; notionalUsd: Decimal; marginUsd: Decimal; riskAmountUsd: Decimal } {
-  const riskAmountUsd = params.equityUsd.times(params.riskPerTradePct / 100).times(params.sizeMultiplier);
-  const stopDistance = params.entryPrice.minus(params.stopLoss).abs();
-  if (stopDistance.lte(0)) {
-    return { qty: new Decimal(0), notionalUsd: new Decimal(0), marginUsd: new Decimal(0), riskAmountUsd };
-  }
-  const rawQty = riskAmountUsd.div(stopDistance);
+}): { qty: Decimal; notionalUsd: Decimal; marginUsd: Decimal } {
+  const notionalTarget = params.equityUsd.times(params.positionSizePct / 100).times(params.leverage);
+  const rawQty = notionalTarget.div(params.entryPrice);
   const step = new Decimal(params.qtyStep || 0.001);
   const qty = rawQty.div(step).floor().times(step);
   const notionalUsd = qty.times(params.entryPrice);
   const marginUsd = notionalUsd.div(params.leverage);
-  return { qty, notionalUsd, marginUsd, riskAmountUsd };
+  return { qty, notionalUsd, marginUsd };
 }

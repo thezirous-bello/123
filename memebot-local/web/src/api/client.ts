@@ -275,6 +275,20 @@ export const api = {
   tokenHistory: (mint: string, limit = 60) => get<PricePoint[]>(`/tokens/${mint}/history?limit=${limit}`),
   providerStatus: () => get<ProviderHealth[]>("/providers/status"),
 
+  spotStatus: () => get<SpotStatus>("/spot/status"),
+  spotWallet: (mode?: BybitMode) => get<SpotWallet>(`/spot/wallet${mode ? `?mode=${mode}` : ""}`),
+  spotConfig: () => get<SpotStrategyConfig>("/spot/config"),
+  updateSpotConfig: (patchBody: Partial<SpotStrategyConfig>) => patch<SpotStrategyConfig>("/spot/config", patchBody),
+  spotStart: () => post("/spot/control/start"),
+  spotStop: () => post("/spot/control/stop"),
+  spotSetMode: (mode: BybitMode, confirmed: boolean) => post("/spot/control/mode", { mode, confirmed }),
+  spotEmergencyStop: (reason: string) => post("/spot/control/emergency-stop", { reason }),
+  spotResume: () => post("/spot/control/resume", { confirm: true }),
+  spotSignals: () => get<SpotSignal[]>("/spot/signals"),
+  spotPositions: (mode?: BybitMode) => get<SpotPosition[]>(`/spot/positions${mode ? `?mode=${mode}` : ""}`),
+  spotTrades: () => get<SpotTrade[]>("/spot/trades"),
+  closeSpotPosition: (id: string) => post(`/spot/positions/${id}/close`),
+
   futuresStatus: () => get<FuturesStatus>("/futures/status"),
   futuresWallet: (mode?: BybitMode) => get<FuturesWallet>(`/futures/wallet${mode ? `?mode=${mode}` : ""}`),
   futuresConfig: () => get<FuturesStrategyConfig>("/futures/config"),
@@ -290,11 +304,19 @@ export const api = {
   closeFuturesPosition: (id: string) => post(`/futures/positions/${id}/close`),
 };
 
-// ---- Bybit futures bot types ----
+// ---- Bybit bots: shared types ----
 
 export type BybitMode = "testnet" | "live";
 
-export interface FuturesStatus {
+export interface BybitTakeProfit {
+  label: "tp1" | "tp2" | "tp3";
+  price: number;
+  closePct: number;
+}
+
+// ---- Bybit SPOT bot types ----
+
+export interface SpotStatus {
   running: boolean;
   mode: BybitMode;
   emergencyStopped: boolean;
@@ -309,14 +331,14 @@ export interface FuturesStatus {
   updatedAt: string;
 }
 
-export interface FuturesWallet {
+export interface SpotWallet {
   configured: boolean;
   mode: BybitMode;
   totalEquityUsd: number | null;
   availableBalanceUsd: number | null;
 }
 
-export interface FuturesStrategyConfig {
+export interface SpotStrategyConfig {
   enabled: boolean;
   symbolUniverse: "auto" | "manual";
   autoTopNByVolume: number;
@@ -350,14 +372,9 @@ export interface FuturesStrategyConfig {
   btcStochRsiOverboughtReject: number;
   btcOrderbookAskBidRatioMax: number;
   btcRsiOverboughtMax: number;
-  fundingRateMinPct: number;
-  fundingRateMaxPct: number;
-  openInterestVs100dAvgMaxPct: number;
   entryPriceMaxDriftPct: number;
   signalExpiryMinutes: number;
   riskPerTradePct: number;
-  leverage: number;
-  maxLeverage: number;
   tp1ClosePct: number;
   tp2ClosePct: number;
   moveSlToBreakevenAtTp1: boolean;
@@ -366,11 +383,146 @@ export interface FuturesStrategyConfig {
   dailyMaxLossPct: number;
 }
 
-export interface FuturesTakeProfit {
-  label: "tp1" | "tp2" | "tp3";
-  price: number;
-  closePct: number;
+export interface SpotSignal {
+  id: string;
+  symbol: string;
+  side: "long";
+  status: "pending" | "active" | "filled" | "cancelled" | "expired";
+  entryPrice: string;
+  stopLoss: string;
+  takeProfits: BybitTakeProfit[];
+  score: string;
+  stage1: Record<string, unknown>;
+  stage2: Record<string, unknown>;
+  cancelledReason: string | null;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
+
+export interface SpotPosition {
+  id: string;
+  signalId: string | null;
+  symbol: string;
+  side: "long";
+  mode: BybitMode;
+  status: "open" | "closed";
+  entryPrice: string;
+  qty: string;
+  remainingQty: string;
+  notionalUsd: string;
+  stopLoss: string;
+  takeProfits: BybitTakeProfit[];
+  takeProfitsFilled: string[];
+  breakevenMoved: boolean;
+  trailingActive: boolean;
+  trailingStopPrice: string | null;
+  bybitOrderId: string | null;
+  realizedPnlUsd: string;
+  closeReason: string | null;
+  openedAt: string;
+  closedAt: string | null;
+}
+
+export interface SpotTrade {
+  id: string;
+  position_id: string | null;
+  symbol: string;
+  side: "buy" | "sell";
+  mode: BybitMode;
+  qty: string;
+  price_usd: string;
+  notional_usd: string;
+  fee_usd: string;
+  bybit_order_id: string | null;
+  status: "simulated" | "submitted" | "confirmed" | "failed";
+  failure_reason: string | null;
+  created_at: string;
+}
+
+// ---- Bybit FUTURES bot types (long & short, dynamic leverage) ----
+
+export interface FuturesStatus {
+  running: boolean;
+  mode: BybitMode;
+  emergencyStopped: boolean;
+  emergencyStoppedAt: string | null;
+  emergencyStoppedReason: string | null;
+  consecutiveLosses: number;
+  tradingHaltedUntil: string | null;
+  liveTradingAllowedByConfig: boolean;
+  testnetConfigured: boolean;
+  liveConfigured: boolean;
+  strategyEnabled: boolean;
+  updatedAt: string;
+}
+
+export interface FuturesWallet {
+  configured: boolean;
+  mode: BybitMode;
+  totalEquityUsd: number | null;
+  availableBalanceUsd: number | null;
+}
+
+export interface FuturesStrategyConfig {
+  enabled: boolean;
+  symbolUniverse: "auto" | "manual";
+  autoTopNByVolume: number;
+  manualSymbols: string[];
+  minCompletedCandles: number;
+  atrOverCloseMax: number;
+  maxSpreadPct: number;
+  min24hTurnoverUsd: number;
+  entryZoneNearPct: number;
+  entryZoneFarPct: number;
+  trendEmaPeriod: number;
+  stochRsiLongKMax: number;
+  stochRsiShortKMin: number;
+  rsiLongMin: number;
+  rsiLongMax: number;
+  rsiShortMin: number;
+  rsiShortMax: number;
+  slAtrMultiplier: number;
+  maxStopLossDistancePct: number;
+  tp1Pct: number;
+  tp2Pct: number;
+  tp3AtrTrailMultiplier: number;
+  minRiskReward: number;
+  maxPendingSignals: number;
+  maxActiveTrades: number;
+  btcVolatilityShockCheckEnabled: boolean;
+  fearGreedLongPreferAbove: number;
+  fearGreedLongStrongAbove: number;
+  fearGreedShortPreferBelow: number;
+  fearGreedShortStrongBelow: number;
+  btcStochRsiOverboughtReject: number;
+  btcRsiOverboughtMax: number;
+  fundingLongMaxPct: number;
+  fundingShortMinPct: number;
+  openInterestVs100dAvgMaxPct: number;
+  entryPriceMaxDriftPct: number;
+  signalExpiryMinutes: number;
+  confidenceHighScoreMin: number;
+  confidenceMediumScoreMin: number;
+  minLeverage: number;
+  maxLeverage: number;
+  leverageHighConfidence: number;
+  leverageMediumConfidence: number;
+  leverageLowConfidence: number;
+  minPositionSizePct: number;
+  maxPositionSizePct: number;
+  positionSizeHighConfidencePct: number;
+  positionSizeMediumConfidencePct: number;
+  positionSizeLowConfidencePct: number;
+  tp1ClosePct: number;
+  tp2ClosePct: number;
+  moveSlToBreakevenAtTp1: boolean;
+  trailingAtrMultiplier: number;
+  stopAfterConsecutiveLosses: number;
+  dailyMaxLossPct: number;
+}
+
+export type Confidence = "low" | "medium" | "high";
 
 export interface FuturesSignal {
   id: string;
@@ -379,8 +531,11 @@ export interface FuturesSignal {
   status: "pending" | "active" | "filled" | "cancelled" | "expired";
   entryPrice: string;
   stopLoss: string;
-  takeProfits: FuturesTakeProfit[];
+  takeProfits: BybitTakeProfit[];
   score: string;
+  confidence: Confidence;
+  leverage: number;
+  positionSizePct: string;
   stage1: Record<string, unknown>;
   stage2: Record<string, unknown>;
   cancelledReason: string | null;
@@ -397,13 +552,14 @@ export interface FuturesPosition {
   mode: BybitMode;
   status: "open" | "closed";
   leverage: number;
+  confidence: Confidence;
   entryPrice: string;
   qty: string;
   remainingQty: string;
   notionalUsd: string;
   marginUsd: string;
   stopLoss: string;
-  takeProfits: FuturesTakeProfit[];
+  takeProfits: BybitTakeProfit[];
   takeProfitsFilled: string[];
   breakevenMoved: boolean;
   trailingActive: boolean;

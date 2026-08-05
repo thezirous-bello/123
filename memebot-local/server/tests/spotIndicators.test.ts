@@ -13,7 +13,7 @@ import {
   sma,
   stddevOfReturns,
   stochRsi,
-} from "../src/futures/indicators.js";
+} from "../src/ta/indicators.js";
 import type { Candle } from "../src/bybit/marketData.js";
 
 function candle(i: number, partial: Partial<Candle>): Candle {

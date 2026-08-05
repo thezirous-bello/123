@@ -1,17 +1,17 @@
 import { Decimal } from "../lib/decimal.js";
-import type { FuturesPosition } from "./repository.js";
-import type { FuturesStrategyConfig } from "./schema.js";
+import type { SpotPosition } from "./repository.js";
+import type { SpotStrategyConfig } from "./schema.js";
 
-export interface FuturesExitDecision {
+export interface SpotExitDecision {
   action: "stop_loss" | "trailing_stop" | "tp1" | "tp2";
   closeQty: Decimal;
   moveToBreakeven: boolean;
 }
 
-/** Pure decision function — never touches the DB or places orders.
- * Direction-aware throughout (side is "long" or "short"), unlike the spot
- * bot's tradeManager which only ever sees "long". */
-export function evaluateFuturesExit(position: FuturesPosition, currentPrice: Decimal, config: FuturesStrategyConfig): FuturesExitDecision | null {
+/** Pure decision function — never touches the DB or places orders. The
+ * controller is responsible for executing whatever this returns. Mirrors
+ * the meme-coin bot's evaluateExitAction/positionManager split. */
+export function evaluateSpotExit(position: SpotPosition, currentPrice: Decimal, config: SpotStrategyConfig): SpotExitDecision | null {
   const isLong = position.side === "long";
   const effectiveStop = position.trailingActive && position.trailingStopPrice ? position.trailingStopPrice : position.stopLoss;
   const stopBreached = isLong ? currentPrice.lte(effectiveStop) : currentPrice.gte(effectiveStop);
@@ -44,11 +44,10 @@ export function evaluateFuturesExit(position: FuturesPosition, currentPrice: Dec
 }
 
 /** Ratchets the ATR trailing stop for the final runner tranche, active only
- * after TP2 has filled ("Let final tranche trail using ATR"). Returns the
+ * after TP2 has filled ("Let final 25% trail using 1.2 x ATR"). Returns the
  * new trailing-stop price only when it actually improves (never loosens
- * the stop — tightens toward price for longs, toward price for shorts too,
- * i.e. always moves in the position's favor), or null otherwise. */
-export function computeTrailingStopUpdate(position: FuturesPosition, currentPrice: Decimal, currentAtr: number, config: FuturesStrategyConfig): Decimal | null {
+ * the stop), or null if there's nothing to update this tick. */
+export function computeTrailingStopUpdate(position: SpotPosition, currentPrice: Decimal, currentAtr: number, config: SpotStrategyConfig): Decimal | null {
   if (!position.takeProfitsFilled.includes("tp2")) return null;
   const isLong = position.side === "long";
   const trailDistance = new Decimal(currentAtr * config.trailingAtrMultiplier);

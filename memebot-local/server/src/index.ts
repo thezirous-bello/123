@@ -9,6 +9,7 @@ import "./db/index.js";
 import { logger } from "./lib/logger.js";
 import { isWalletConfigured } from "./wallet/walletManager.js";
 import { stopBot } from "./engine/botController.js";
+import { stopSpotBot } from "./spot/controller.js";
 import { stopFuturesBot } from "./futures/controller.js";
 import { recordHttpTraffic, startSystemStatsSampler } from "./lib/systemStats.js";
 
@@ -25,6 +26,7 @@ import streamRoutes from "./routes/stream.js";
 import systemRoutes from "./routes/system.js";
 import analyticsRoutes from "./routes/analytics.js";
 import providerRoutes from "./routes/providers.js";
+import spotRoutes from "./routes/spot.js";
 import futuresRoutes from "./routes/futures.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -61,6 +63,7 @@ await app.register(streamRoutes, { prefix: "/api" });
 await app.register(systemRoutes, { prefix: "/api" });
 await app.register(analyticsRoutes, { prefix: "/api" });
 await app.register(providerRoutes, { prefix: "/api" });
+await app.register(spotRoutes, { prefix: "/api" });
 await app.register(futuresRoutes, { prefix: "/api" });
 
 startSystemStatsSampler();
@@ -100,6 +103,7 @@ if (!isProd) {
 async function shutdown() {
   logger.info("Shutting down...");
   stopBot();
+  stopSpotBot();
   stopFuturesBot();
   await app.close();
   process.exit(0);

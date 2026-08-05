@@ -180,9 +180,97 @@ CREATE TABLE IF NOT EXISTS bot_logs (
 CREATE INDEX IF NOT EXISTS idx_bot_logs_created ON bot_logs (created_at);
 
 -- ============================================================
--- Bybit futures bot — fully independent from the Solana bot above.
+-- Bybit spot bot — fully independent from the Solana bot above.
 -- Shares only `settings`, `bot_logs`, and `risk_events` (via distinct
--- category/type prefixes) so both bots show up in one audit trail.
+-- category/type prefixes) so all bots show up in one audit trail.
+-- Spot has no leverage/margin/shorting — every position is a plain buy,
+-- held, then sold.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS spot_bot_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  running INTEGER NOT NULL DEFAULT 0,
+  mode TEXT NOT NULL DEFAULT 'testnet' CHECK (mode IN ('testnet', 'live')),
+  emergency_stopped INTEGER NOT NULL DEFAULT 0,
+  emergency_stopped_at TEXT,
+  emergency_stopped_reason TEXT,
+  emergency_stopped_by TEXT,
+  consecutive_losses INTEGER NOT NULL DEFAULT 0,
+  trading_halted_until TEXT,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS spot_signals (
+  id TEXT PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  side TEXT NOT NULL CHECK (side IN ('long')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'active', 'filled', 'cancelled', 'expired')) DEFAULT 'pending',
+  entry_price TEXT NOT NULL,
+  stop_loss TEXT NOT NULL,
+  take_profits_json TEXT NOT NULL DEFAULT '[]',
+  score TEXT NOT NULL,
+  stage1_json TEXT NOT NULL DEFAULT '{}',
+  stage2_json TEXT NOT NULL DEFAULT '{}',
+  cancelled_reason TEXT,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_spot_signals_status ON spot_signals (status, created_at);
+CREATE INDEX IF NOT EXISTS idx_spot_signals_symbol ON spot_signals (symbol);
+
+CREATE TABLE IF NOT EXISTS spot_positions (
+  id TEXT PRIMARY KEY,
+  signal_id TEXT REFERENCES spot_signals (id) ON DELETE SET NULL,
+  symbol TEXT NOT NULL,
+  side TEXT NOT NULL CHECK (side IN ('long')),
+  mode TEXT NOT NULL CHECK (mode IN ('testnet', 'live')),
+  status TEXT NOT NULL CHECK (status IN ('open', 'closed')) DEFAULT 'open',
+  entry_price TEXT NOT NULL,
+  qty TEXT NOT NULL,
+  remaining_qty TEXT NOT NULL,
+  notional_usd TEXT NOT NULL,
+  stop_loss TEXT NOT NULL,
+  take_profits_json TEXT NOT NULL DEFAULT '[]',
+  take_profits_filled_json TEXT NOT NULL DEFAULT '[]',
+  breakeven_moved INTEGER NOT NULL DEFAULT 0,
+  trailing_active INTEGER NOT NULL DEFAULT 0,
+  trailing_stop_price TEXT,
+  bybit_order_id TEXT,
+  realized_pnl_usd TEXT NOT NULL DEFAULT '0',
+  close_reason TEXT,
+  opened_at TEXT NOT NULL,
+  closed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_spot_positions_status ON spot_positions (status, mode);
+CREATE INDEX IF NOT EXISTS idx_spot_positions_symbol ON spot_positions (symbol);
+
+CREATE TABLE IF NOT EXISTS spot_trades (
+  id TEXT PRIMARY KEY,
+  position_id TEXT REFERENCES spot_positions (id) ON DELETE SET NULL,
+  symbol TEXT NOT NULL,
+  side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+  mode TEXT NOT NULL CHECK (mode IN ('testnet', 'live')),
+  qty TEXT NOT NULL,
+  price_usd TEXT NOT NULL,
+  notional_usd TEXT NOT NULL,
+  fee_usd TEXT NOT NULL DEFAULT '0',
+  bybit_order_id TEXT,
+  status TEXT NOT NULL CHECK (status IN ('simulated', 'submitted', 'confirmed', 'failed')),
+  failure_reason TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_spot_trades_position ON spot_trades (position_id);
+CREATE INDEX IF NOT EXISTS idx_spot_trades_created ON spot_trades (created_at);
+
+-- ============================================================
+-- Bybit futures bot — the third, independent bot. Unlike spot, this one
+-- trades leveraged USDT perpetuals in both directions (long AND short),
+-- with dynamic leverage and position sizing driven by a per-signal
+-- confidence score.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS futures_bot_state (
@@ -207,6 +295,9 @@ CREATE TABLE IF NOT EXISTS futures_signals (
   stop_loss TEXT NOT NULL,
   take_profits_json TEXT NOT NULL DEFAULT '[]',
   score TEXT NOT NULL,
+  confidence TEXT NOT NULL DEFAULT 'medium' CHECK (confidence IN ('low', 'medium', 'high')),
+  leverage INTEGER NOT NULL,
+  position_size_pct TEXT NOT NULL,
   stage1_json TEXT NOT NULL DEFAULT '{}',
   stage2_json TEXT NOT NULL DEFAULT '{}',
   cancelled_reason TEXT,
@@ -226,6 +317,7 @@ CREATE TABLE IF NOT EXISTS futures_positions (
   mode TEXT NOT NULL CHECK (mode IN ('testnet', 'live')),
   status TEXT NOT NULL CHECK (status IN ('open', 'closed')) DEFAULT 'open',
   leverage INTEGER NOT NULL,
+  confidence TEXT NOT NULL DEFAULT 'medium' CHECK (confidence IN ('low', 'medium', 'high')),
   entry_price TEXT NOT NULL,
   qty TEXT NOT NULL,
   remaining_qty TEXT NOT NULL,

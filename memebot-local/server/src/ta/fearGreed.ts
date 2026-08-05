@@ -4,6 +4,7 @@ import { recordProviderFailure, recordProviderSuccess } from "../lib/providerHea
 // alternative.me's Crypto Fear & Greed Index — free, no API key, documented
 // at https://alternative.me/crypto/fear-and-greed-index. Updates once daily.
 const FNG_URL = "https://api.alternative.me/fng/?limit=1&format=json";
+const FNG_TREND_URL = "https://api.alternative.me/fng/?limit=2&format=json";
 
 interface FngResponse {
   data: Array<{ value: string; value_classification: string; timestamp: string }>;
@@ -39,5 +40,34 @@ export async function getFearGreedIndex(): Promise<FearGreedReading | null> {
     logger.warn({ err: (err as Error).message }, "Fear & Greed index request failed");
     recordProviderFailure("fearGreed", (err as Error).message);
     return cached;
+  }
+}
+
+let cachedTrend: FearGreedReading[] | null = null;
+let cachedTrendAt = 0;
+
+/** Today's reading plus yesterday's, oldest-first — lets a caller detect
+ * whether the index is actually rising or falling, not just its level. */
+export async function getFearGreedTrend(): Promise<FearGreedReading[] | null> {
+  if (cachedTrend && Date.now() - cachedTrendAt < CACHE_MS) return cachedTrend;
+  const startedAt = performance.now();
+  try {
+    const res = await fetch(FNG_TREND_URL, { headers: { accept: "application/json" } });
+    if (!res.ok) {
+      recordProviderFailure("fearGreed", `HTTP ${res.status}`);
+      return cachedTrend;
+    }
+    const data = (await res.json()) as FngResponse;
+    if (data.data.length === 0) return cachedTrend;
+    recordProviderSuccess("fearGreed", performance.now() - startedAt);
+    cachedTrend = data.data
+      .map((row) => ({ value: Number(row.value), classification: row.value_classification, fetchedAt: new Date().toISOString() }))
+      .reverse();
+    cachedTrendAt = Date.now();
+    return cachedTrend;
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, "Fear & Greed trend request failed");
+    recordProviderFailure("fearGreed", (err as Error).message);
+    return cachedTrend;
   }
 }

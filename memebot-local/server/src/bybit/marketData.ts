@@ -1,9 +1,13 @@
 import { bybitGetPublic, type BybitMode } from "./client.js";
 
 // Field shapes verified against Bybit's official V5 API docs / SDK type
-// defs (bybit-exchange.github.io/docs/v5/market/*). All USDT perpetuals use
-// category=linear throughout this app — no inverse/option contracts.
-const CATEGORY = "linear" as const;
+// defs (bybit-exchange.github.io/docs/v5/market/*). Every market-data call
+// below is shared between the spot bot (category=spot) and futures bot
+// (category=linear — USDT perpetuals only, no inverse/option contracts);
+// funding rate and open interest have no spot equivalent and are always
+// category=linear.
+export type BybitCategory = "spot" | "linear";
+const DEFAULT_CATEGORY: BybitCategory = "linear";
 
 export interface Candle {
   startTime: number;
@@ -24,11 +28,17 @@ interface KlineResult {
 }
 
 /** Bybit returns klines newest-first; this returns them oldest-first, which
- * is what every indicator function in ../futures/indicators.ts expects. */
-export async function getKlines(symbol: string, intervalMinutes: 30 | 60 | 240, limit = 200, mode: BybitMode = "testnet"): Promise<Candle[]> {
+ * is what every indicator function in ../ta/indicators.ts expects. */
+export async function getKlines(
+  symbol: string,
+  intervalMinutes: 30 | 60 | 240,
+  limit = 200,
+  mode: BybitMode = "testnet",
+  category: BybitCategory = DEFAULT_CATEGORY,
+): Promise<Candle[]> {
   const result = await bybitGetPublic<KlineResult>(
     "/v5/market/kline",
-    { category: CATEGORY, symbol, interval: String(intervalMinutes), limit },
+    { category, symbol, interval: String(intervalMinutes), limit },
     mode,
   );
   return result.list
@@ -77,8 +87,8 @@ interface TickersResult {
   list: TickerRow[];
 }
 
-export async function getTicker(symbol: string, mode: BybitMode = "testnet"): Promise<TickerSnapshot | null> {
-  const result = await bybitGetPublic<TickersResult>("/v5/market/tickers", { category: CATEGORY, symbol }, mode);
+export async function getTicker(symbol: string, mode: BybitMode = "testnet", category: BybitCategory = DEFAULT_CATEGORY): Promise<TickerSnapshot | null> {
+  const result = await bybitGetPublic<TickersResult>("/v5/market/tickers", { category, symbol }, mode);
   const row = result.list[0];
   if (!row) return null;
   return {
@@ -96,8 +106,8 @@ export async function getTicker(symbol: string, mode: BybitMode = "testnet"): Pr
   };
 }
 
-export async function getAllTickers(mode: BybitMode = "testnet"): Promise<TickerSnapshot[]> {
-  const result = await bybitGetPublic<TickersResult>("/v5/market/tickers", { category: CATEGORY }, mode);
+export async function getAllTickers(mode: BybitMode = "testnet", category: BybitCategory = DEFAULT_CATEGORY): Promise<TickerSnapshot[]> {
+  const result = await bybitGetPublic<TickersResult>("/v5/market/tickers", { category }, mode);
   return result.list.map((row) => ({
     symbol: row.symbol,
     lastPrice: Number(row.lastPrice),
@@ -125,8 +135,13 @@ export interface OrderbookSnapshot {
   asks: Array<{ price: number; size: number }>;
 }
 
-export async function getOrderbook(symbol: string, depth = 25, mode: BybitMode = "testnet"): Promise<OrderbookSnapshot> {
-  const result = await bybitGetPublic<OrderbookResult>("/v5/market/orderbook", { category: CATEGORY, symbol, limit: depth }, mode);
+export async function getOrderbook(
+  symbol: string,
+  depth = 25,
+  mode: BybitMode = "testnet",
+  category: BybitCategory = DEFAULT_CATEGORY,
+): Promise<OrderbookSnapshot> {
+  const result = await bybitGetPublic<OrderbookResult>("/v5/market/orderbook", { category, symbol, limit: depth }, mode);
   return {
     bids: result.b.map(([price, size]) => ({ price: Number(price), size: Number(size) })),
     asks: result.a.map(([price, size]) => ({ price: Number(price), size: Number(size) })),
@@ -149,7 +164,7 @@ interface OpenInterestResult {
 export async function getOpenInterestHistory(symbol: string, days = 100, mode: BybitMode = "testnet"): Promise<Array<{ timestamp: number; openInterest: number }>> {
   const result = await bybitGetPublic<OpenInterestResult>(
     "/v5/market/open-interest",
-    { category: CATEGORY, symbol, intervalTime: "1d", limit: Math.min(days, 200) },
+    { category: "linear", symbol, intervalTime: "1d", limit: Math.min(days, 200) },
     mode,
   );
   return result.list.map((row) => ({ timestamp: Number(row.timestamp), openInterest: Number(row.openInterest) })).reverse();
@@ -167,7 +182,7 @@ interface FundingHistoryResult {
 }
 
 export async function getLatestFundingRate(symbol: string, mode: BybitMode = "testnet"): Promise<number | null> {
-  const result = await bybitGetPublic<FundingHistoryResult>("/v5/market/funding/history", { category: CATEGORY, symbol, limit: 1 }, mode);
+  const result = await bybitGetPublic<FundingHistoryResult>("/v5/market/funding/history", { category: "linear", symbol, limit: 1 }, mode);
   const row = result.list[0];
   return row ? Number(row.fundingRate) * 100 : null;
 }
@@ -175,9 +190,12 @@ export async function getLatestFundingRate(symbol: string, mode: BybitMode = "te
 interface InstrumentInfoRow {
   symbol: string;
   status: string;
-  lotSizeFilter: { qtyStep: string; minOrderQty: string };
+  // Linear: qtyStep. Spot: basePrecision instead (no qtyStep field at all) —
+  // verified against Bybit's own SDK type defs, these genuinely differ.
+  lotSizeFilter: { qtyStep?: string; basePrecision?: string; minOrderQty: string };
   priceFilter: { tickSize: string };
-  leverageFilter: { minLeverage: string; maxLeverage: string };
+  // Spot instruments have no leverageFilter at all (spot has no leverage).
+  leverageFilter?: { minLeverage: string; maxLeverage: string };
 }
 
 interface InstrumentsInfoResult {
@@ -194,23 +212,28 @@ export interface InstrumentInfo {
   maxLeverage: number;
 }
 
-/** Every symbol's quantity/price rounding rules and max leverage — required
- * before placing any order so qty/price aren't rejected for wrong precision. */
-export async function getInstrumentInfo(symbol: string, mode: BybitMode = "testnet"): Promise<InstrumentInfo | null> {
-  const result = await bybitGetPublic<InstrumentsInfoResult>("/v5/market/instruments-info", { category: CATEGORY, symbol }, mode);
+/** Every symbol's quantity/price rounding rules (and max leverage, for
+ * linear only — spot instruments report maxLeverage as 1) — required before
+ * placing any order so qty/price aren't rejected for wrong precision. */
+export async function getInstrumentInfo(
+  symbol: string,
+  mode: BybitMode = "testnet",
+  category: BybitCategory = DEFAULT_CATEGORY,
+): Promise<InstrumentInfo | null> {
+  const result = await bybitGetPublic<InstrumentsInfoResult>("/v5/market/instruments-info", { category, symbol }, mode);
   const row = result.list[0];
   if (!row) return null;
   return {
     symbol: row.symbol,
     tradingActive: row.status === "Trading",
-    qtyStep: Number(row.lotSizeFilter.qtyStep),
+    qtyStep: Number(row.lotSizeFilter.qtyStep ?? row.lotSizeFilter.basePrecision ?? 0.001),
     minOrderQty: Number(row.lotSizeFilter.minOrderQty),
     tickSize: Number(row.priceFilter.tickSize),
-    maxLeverage: Number(row.leverageFilter.maxLeverage),
+    maxLeverage: row.leverageFilter ? Number(row.leverageFilter.maxLeverage) : 1,
   };
 }
 
 export async function listActiveLinearSymbols(mode: BybitMode = "testnet"): Promise<string[]> {
-  const result = await bybitGetPublic<InstrumentsInfoResult>("/v5/market/instruments-info", { category: CATEGORY }, mode);
+  const result = await bybitGetPublic<InstrumentsInfoResult>("/v5/market/instruments-info", { category: "linear" }, mode);
   return result.list.filter((r) => r.status === "Trading" && r.symbol.endsWith("USDT")).map((r) => r.symbol);
 }
