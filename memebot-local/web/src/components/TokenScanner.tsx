@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { api, type SecurityReport, type TokenSnapshot } from "../api/client.js";
+import { useEffect, useState } from "react";
+import { api, type SecurityReport, type TokenSnapshot, type WatchlistEntry } from "../api/client.js";
+import { useRefreshSignal } from "../hooks/useRefreshSignal.js";
 import { Panel } from "./Panel.js";
 import { Badge } from "./Badge.js";
 
@@ -10,12 +11,42 @@ const RISK_TONE: Record<string, "good" | "warn" | "danger" | "neutral"> = {
   critical: "danger",
 };
 
+function shortMint(mint: string): string {
+  return `${mint.slice(0, 6)}…${mint.slice(-6)}`;
+}
+
 export function TokenScanner() {
+  const tick = useRefreshSignal();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TokenSnapshot[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ snapshot: TokenSnapshot; security: SecurityReport } | null>(null);
+  const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
+  const [discovering, setDiscovering] = useState(false);
+  const [discoverMsg, setDiscoverMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.watchlist().then(setWatchlist).catch(() => {});
+  }, [tick]);
+
+  async function discoverNow() {
+    setDiscovering(true);
+    setDiscoverMsg(null);
+    try {
+      const result = await api.discoverTokens();
+      setDiscoverMsg(
+        result.candidates === 0
+          ? "No candidates returned — DexScreener's discovery feeds may be temporarily unavailable."
+          : `Found ${result.candidates} trending Solana token(s), added ${result.added} new to the watchlist.`,
+      );
+      setWatchlist(await api.watchlist());
+    } catch (err) {
+      setDiscoverMsg((err as Error).message);
+    } finally {
+      setDiscovering(false);
+    }
+  }
 
   async function search() {
     if (!query.trim()) return;
@@ -44,7 +75,88 @@ export function TokenScanner() {
 
   return (
     <div className="space-y-4">
-      <Panel title="Token Scanner">
+      <Panel
+        title={`Watching (${watchlist.length})`}
+        action={
+          <button
+            onClick={discoverNow}
+            disabled={discovering}
+            className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
+          >
+            {discovering ? "Discovering…" : "Discover Now"}
+          </button>
+        }
+      >
+        <p className="mb-3 text-xs text-white/40">
+          While the bot is running it automatically pulls trending/boosted Solana tokens from DexScreener every 5 minutes and adds new ones here —
+          you don't have to add tokens yourself. "Discover Now" runs that same pass immediately instead of waiting.
+        </p>
+        {discoverMsg && <p className="mb-3 text-xs text-violet-300">{discoverMsg}</p>}
+        {watchlist.length === 0 ? (
+          <p className="text-sm text-white/40">Nothing watched yet. Start the bot to let it auto-discover, or click "Discover Now".</p>
+        ) : (
+          <div className="max-h-64 overflow-y-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 bg-[#131318] text-xs uppercase text-white/40">
+                <tr>
+                  <th className="pb-2">Token</th>
+                  <th className="pb-2">Mint</th>
+                  <th className="pb-2">Added</th>
+                  <th className="pb-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {watchlist.map((w) => (
+                  <tr key={w.mint} className="border-t border-white/5">
+                    <td className="py-1.5">{w.symbol ?? <span className="text-white/30">unknown</span>}</td>
+                    <td className="py-1.5 font-mono text-xs text-white/40">{shortMint(w.mint)}</td>
+                    <td className="py-1.5 text-xs text-white/40">{new Date(w.addedAt).toLocaleTimeString()}</td>
+                    <td className="py-1.5 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => inspect(w.mint)} className="rounded border border-white/15 px-2 py-0.5 text-xs hover:bg-white/10">
+                          Details
+                        </button>
+                        {w.blocked ? (
+                          <button
+                            onClick={async () => {
+                              await api.unblockToken(w.mint);
+                              setWatchlist(await api.watchlist());
+                            }}
+                            className="rounded border border-white/15 px-2 py-0.5 text-xs hover:bg-white/10"
+                          >
+                            Unblock
+                          </button>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              await api.blockToken(w.mint);
+                              setWatchlist(await api.watchlist());
+                            }}
+                            className="rounded border border-red-500/40 px-2 py-0.5 text-xs text-red-300 hover:bg-red-500/10"
+                          >
+                            Block
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => {
+                            await api.removeWatchlist(w.mint);
+                            setWatchlist(await api.watchlist());
+                          }}
+                          className="rounded border border-white/15 px-2 py-0.5 text-xs hover:bg-white/10"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Manual Search">
         <div className="flex gap-2">
           <input
             value={query}

@@ -4,8 +4,9 @@ import { recordLog } from "../lib/auditLog.js";
 import { checkSellRoute } from "../jupiter/quote.js";
 import { quoteTokenDecimals, quoteTokenMint } from "../jupiter/constants.js";
 import { fetchHolderConcentration, fetchOnChainMintInfo } from "../market/onchain.js";
+import { discoverTrendingSolanaMints } from "../market/discovery.js";
 import { getFreshTokenSnapshot, isSnapshotFresh, MAX_SNAPSHOT_AGE_SECONDS } from "../market/snapshotService.js";
-import { listWatchlist } from "../market/watchlist.js";
+import { addToWatchlist, listWatchlist } from "../market/watchlist.js";
 import { persistSecurityReport, runTokenSecurityAnalysis } from "../security/tokenSecurity.js";
 import { getActiveStrategy } from "../strategy/repository.js";
 import { getBotState, isEmergencyStopped, setActiveStrategy, setMode, setRunning, type BotState } from "./emergency.js";
@@ -23,9 +24,19 @@ import { openPositionForMint, type Mode } from "./queries.js";
 import type { StrategyRules } from "../strategy/schema.js";
 
 const TICK_INTERVAL_MS = 20_000;
+// How often to pull fresh candidate tokens from DexScreener's public
+// trending/boosted feeds. Kept well below their rate limits — this is a
+// discovery pass, not per-tick traffic.
+const DISCOVERY_INTERVAL_MS = 5 * 60_000;
+// Caps how many tokens the bot will track at once, whether added manually
+// or discovered automatically, so neither the UI nor the provider requests
+// grow unbounded. Discovery skips adding more once this is hit.
+const MAX_WATCHLIST_SIZE = 60;
+
 let tickHandle: NodeJS.Timeout | null = null;
 let tickCounter = 0;
 let tickInFlight = false;
+let lastDiscoveryAtMs = 0;
 
 export function startBot(): BotState {
   const state = setRunning(true);
@@ -92,8 +103,58 @@ async function runTick() {
   }
 }
 
+/**
+ * Pulls trending/boosted Solana tokens from DexScreener and adds any new
+ * ones to the watchlist automatically — the bot builds its own scan
+ * universe instead of relying on the user to search and click "Watch" on
+ * every token. Runs on its own interval (not every 20s tick) to stay well
+ * within DexScreener's free-tier rate limits, and always fires once
+ * immediately after startup.
+ */
+export async function runAutoDiscovery(): Promise<{ added: number; candidates: number }> {
+  const candidates = await discoverTrendingSolanaMints(30);
+  if (candidates.length === 0) {
+    return { added: 0, candidates: 0 };
+  }
+
+  const current = listWatchlist();
+  if (current.length >= MAX_WATCHLIST_SIZE) {
+    recordLog("debug", "discovery", `Watchlist at capacity (${MAX_WATCHLIST_SIZE}) — skipping new discoveries this round.`);
+    return { added: 0, candidates: candidates.length };
+  }
+
+  const currentMints = new Set(current.map((c) => c.mint));
+  let added = 0;
+  for (const mint of candidates) {
+    if (currentMints.has(mint)) continue;
+    if (current.length + added >= MAX_WATCHLIST_SIZE) break;
+    addToWatchlist(mint, null, null);
+    added += 1;
+  }
+
+  if (added > 0) {
+    recordLog("info", "discovery", `Auto-discovered ${added} new Solana token(s) from DexScreener's trending/boosted feeds.`, {
+      added,
+      candidates: candidates.length,
+    });
+  }
+  return { added, candidates: candidates.length };
+}
+
+async function maybeRunAutoDiscovery() {
+  const now = Date.now();
+  if (now - lastDiscoveryAtMs < DISCOVERY_INTERVAL_MS) return;
+  lastDiscoveryAtMs = now;
+  try {
+    await runAutoDiscovery();
+  } catch (err) {
+    recordLog("warn", "discovery", `Auto-discovery failed: ${(err as Error).message}`);
+  }
+}
+
 async function tick(mode: Mode) {
   tickCounter += 1;
+  await maybeRunAutoDiscovery();
   await manageOpenPositions(mode);
 
   if (isEmergencyStopped()) return; // monitoring continues above; no new entries below
@@ -193,13 +254,14 @@ async function evaluateAndMaybeEnter(mode: Mode, strategyId: string, rules: Stra
   const holderCondition = evaluateHolderConcentration(rules, holders?.top10Percentage ?? null);
   const allConditions = [...entryEval.conditions, holderCondition];
   const passed = allConditions.every((c) => c.passed);
+  const firstFailure = allConditions.find((c) => !c.passed);
 
-  recordLog(passed ? "info" : "debug", "strategy_evaluation", `${passed ? "Signal" : "Rejected"}: ${snapshot.symbol ?? mint}`, {
-    mint,
-    strategyId,
-    conditions: allConditions,
-    snapshot,
-  });
+  recordLog(
+    "info",
+    "strategy_evaluation",
+    passed ? `Signal: ${snapshot.symbol ?? mint}` : `Rejected ${snapshot.symbol ?? mint}: ${firstFailure?.detail ?? "unknown reason"}`,
+    { mint, strategyId, conditions: allConditions, snapshot },
+  );
 
   if (!passed) return;
 

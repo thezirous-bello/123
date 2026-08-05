@@ -6,6 +6,7 @@ import { checkSellRoute } from "../jupiter/quote.js";
 import { quoteTokenMint } from "../jupiter/constants.js";
 import { latestSecurityReport, persistSecurityReport, runTokenSecurityAnalysis } from "../security/tokenSecurity.js";
 import { addToWatchlist, listWatchlist, removeFromWatchlist, setTokenBlocked } from "../market/watchlist.js";
+import { runAutoDiscovery } from "../engine/botController.js";
 import { Decimal } from "../lib/decimal.js";
 
 const SearchQuerySchema = z.object({ q: z.string().min(1).max(100) });
@@ -44,6 +45,11 @@ export default async function tokenRoutes(app: FastifyInstance) {
   });
 
   app.get("/watchlist", async () => listWatchlist());
+
+  /** Manually kick off the same auto-discovery pass the bot runs on its own
+   * interval — lets the dashboard populate the watchlist immediately
+   * instead of waiting for the next scheduled round. */
+  app.post("/tokens/discover", async () => runAutoDiscovery());
 
   app.post("/watchlist", async (request, reply) => {
     const parsed = WatchlistBodySchema.safeParse(request.body);

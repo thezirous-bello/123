@@ -250,6 +250,7 @@ export const api = {
   removeWatchlist: (mint: string) => del(`/watchlist/${mint}`),
   blockToken: (mint: string) => post(`/watchlist/${mint}/block`),
   unblockToken: (mint: string) => post(`/watchlist/${mint}/unblock`),
+  discoverTokens: () => post<{ added: number; candidates: number }>("/tokens/discover"),
 
   listPositions: (mode?: "paper" | "live") => get<Position[]>(`/positions${mode ? `?mode=${mode}` : ""}`),
   sellPosition: (id: string, percentage: number) => post(`/positions/${id}/sell`, { percentage }),
