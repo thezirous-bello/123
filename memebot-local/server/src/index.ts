@@ -9,6 +9,7 @@ import "./db/index.js";
 import { logger } from "./lib/logger.js";
 import { isWalletConfigured } from "./wallet/walletManager.js";
 import { stopBot } from "./engine/botController.js";
+import { recordHttpTraffic, startSystemStatsSampler } from "./lib/systemStats.js";
 
 import statusRoutes from "./routes/status.js";
 import walletRoutes from "./routes/wallet.js";
@@ -20,6 +21,8 @@ import riskRoutes from "./routes/risk.js";
 import controlRoutes from "./routes/control.js";
 import logRoutes from "./routes/logs.js";
 import streamRoutes from "./routes/stream.js";
+import systemRoutes from "./routes/system.js";
+import analyticsRoutes from "./routes/analytics.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === "production";
@@ -36,6 +39,12 @@ await app.register(cors, {
 });
 await app.register(sensible);
 
+app.addHook("onResponse", async (request, reply) => {
+  const bytesIn = Number.parseInt((request.headers["content-length"] as string) ?? "0", 10) || 0;
+  const bytesOut = Number.parseInt(String(reply.getHeader("content-length") ?? "0"), 10) || 0;
+  recordHttpTraffic(bytesIn, bytesOut);
+});
+
 await app.register(statusRoutes, { prefix: "/api" });
 await app.register(walletRoutes, { prefix: "/api" });
 await app.register(strategyRoutes, { prefix: "/api" });
@@ -46,6 +55,10 @@ await app.register(riskRoutes, { prefix: "/api" });
 await app.register(controlRoutes, { prefix: "/api" });
 await app.register(logRoutes, { prefix: "/api" });
 await app.register(streamRoutes, { prefix: "/api" });
+await app.register(systemRoutes, { prefix: "/api" });
+await app.register(analyticsRoutes, { prefix: "/api" });
+
+startSystemStatsSampler();
 
 if (isProd) {
   const webDist = join(__dirname, "..", "..", "web", "dist");

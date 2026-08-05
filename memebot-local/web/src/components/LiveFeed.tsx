@@ -3,6 +3,11 @@ import { api, type LogEntry, type Position, type Trade, type WatchlistEntry } fr
 import { useBotEvent, useRefreshSignal } from "../hooks/useRefreshSignal.js";
 import { Panel } from "./Panel.js";
 import { Badge } from "./Badge.js";
+import { SystemMonitorBar } from "./SystemMonitorBar.js";
+import { PortfolioOverview } from "./PortfolioOverview.js";
+import { DecisionEnginePanel } from "./DecisionEnginePanel.js";
+import { TokenCardsRow } from "./TokenCardsRow.js";
+import { NetworkMapPanel } from "./NetworkMapPanel.js";
 
 type FlashKind = "scan" | "buy" | "sell";
 interface Flash {
@@ -36,7 +41,7 @@ const CATEGORY_TAG: Record<string, string> = {
   paper_account: "ACCT",
 };
 
-export function LiveFeed({ running }: { running: boolean }) {
+export function LiveFeed({ running, mode }: { running: boolean; mode: "paper" | "live" }) {
   const tick = useRefreshSignal();
   const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
   const [openPositions, setOpenPositions] = useState<Position[]>([]);
@@ -104,10 +109,21 @@ export function LiveFeed({ running }: { running: boolean }) {
 
   return (
     <div className="space-y-4">
+      <SystemMonitorBar />
+
+      <NetworkMapPanel />
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
         <RadarPanel nodes={radarNodes} openMints={openMints} flashes={flashes} running={running} />
         <TerminalPanel logs={logs} scrollRef={logScrollRef} eventsPerMin={eventsLastMinute} running={running} />
       </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <PortfolioOverview mode={mode} />
+        <DecisionEnginePanel />
+      </div>
+
+      <TokenCardsRow mode={mode} />
       <TransactionStrip trades={trades} />
     </div>
   );

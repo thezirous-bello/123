@@ -269,4 +269,28 @@ export const api = {
   resume: () => post("/control/resume", { confirm: true }),
 
   logs: (limit = 200) => get<LogEntry[]>(`/logs?limit=${limit}`),
+
+  systemStats: () => get<SystemStats>("/system"),
+  equityCurve: (hours = 24) => get<EquityPoint[]>(`/analytics/equity-curve?hours=${hours}`),
+  tokenHistory: (mint: string, limit = 60) => get<PricePoint[]>(`/tokens/${mint}/history?limit=${limit}`),
 };
+
+export interface SystemStats {
+  cpuPercent: number;
+  memUsedMb: number;
+  memTotalMb: number;
+  uptimeSeconds: number;
+  requestsPerMin: number;
+  bytesInPerMin: number;
+  bytesOutPerMin: number;
+}
+
+export interface EquityPoint {
+  t: string;
+  balance: number;
+}
+
+export interface PricePoint {
+  fetchedAt: string;
+  priceUsd: number | null;
+}

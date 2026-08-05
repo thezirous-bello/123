@@ -99,3 +99,18 @@ export function tokenAgeMinutes(snapshot: TokenSnapshot): number | null {
   if (!snapshot.pairCreatedAt) return null;
   return (Date.now() - new Date(snapshot.pairCreatedAt).getTime()) / 60_000;
 }
+
+export interface PricePoint {
+  fetchedAt: string;
+  priceUsd: number | null;
+}
+
+/** Recent price history for a mint, built from the snapshots the bot has
+ * actually collected while scanning — not a real candlestick feed, but a
+ * genuine record of what price this app observed and when. */
+export function listRecentSnapshots(mint: string, limit = 60): PricePoint[] {
+  const rows = db
+    .prepare("SELECT price_usd, fetched_at FROM token_snapshots WHERE mint = ? ORDER BY fetched_at DESC LIMIT ?")
+    .all(mint, limit) as Array<{ price_usd: string | null; fetched_at: string }>;
+  return rows.reverse().map((r) => ({ fetchedAt: r.fetched_at, priceUsd: r.price_usd !== null ? Number(r.price_usd) : null }));
+}

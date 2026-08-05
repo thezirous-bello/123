@@ -62,7 +62,7 @@ export default function App() {
         </div>
       )}
 
-      {tab === "Live" && <LiveFeed running={status?.running ?? false} />}
+      {tab === "Live" && <LiveFeed running={status?.running ?? false} mode={status?.mode ?? "paper"} />}
       {tab === "Strategy" && <StrategyPanel />}
       {tab === "Scanner" && <TokenScanner />}
       {tab === "Positions" && (

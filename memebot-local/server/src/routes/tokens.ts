@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { searchTokens, getFreshTokenSnapshot } from "../market/snapshotService.js";
+import { searchTokens, getFreshTokenSnapshot, listRecentSnapshots } from "../market/snapshotService.js";
 import { fetchHolderConcentration, fetchOnChainMintInfo } from "../market/onchain.js";
 import { checkSellRoute } from "../jupiter/quote.js";
 import { quoteTokenMint } from "../jupiter/constants.js";
@@ -35,6 +35,12 @@ export default async function tokenRoutes(app: FastifyInstance) {
     persistSecurityReport(security);
 
     return { snapshot, onchain, holders, security };
+  });
+
+  app.get("/tokens/:mint/history", async (request) => {
+    const { mint } = request.params as { mint: string };
+    const { limit } = request.query as { limit?: string };
+    return listRecentSnapshots(mint, limit ? Number.parseInt(limit, 10) : 60);
   });
 
   app.get("/tokens/:mint/security", async (request, reply) => {
