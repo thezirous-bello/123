@@ -1,6 +1,7 @@
 import { env } from "../env.js";
 import { logger } from "../lib/logger.js";
 import { nowIso } from "../db/index.js";
+import { recordProviderFailure, recordProviderSuccess } from "../lib/providerHealth.js";
 import type { TokenSnapshot } from "./types.js";
 
 const SOLANA_CHAIN_ID = "solana";
@@ -27,15 +28,20 @@ interface DexScreenerResponse {
 
 async function dexScreenerFetch(path: string): Promise<DexScreenerResponse | null> {
   const url = `${env.DEXSCREENER_API_URL}${path}`;
+  const startedAt = performance.now();
   try {
     const res = await fetch(url, { headers: { accept: "application/json" } });
     if (!res.ok) {
       logger.warn({ url, status: res.status }, "DexScreener request failed");
+      recordProviderFailure("dexscreener", `HTTP ${res.status}`);
       return null;
     }
-    return (await res.json()) as DexScreenerResponse;
+    const data = (await res.json()) as DexScreenerResponse;
+    recordProviderSuccess("dexscreener", performance.now() - startedAt);
+    return data;
   } catch (err) {
     logger.warn({ url, err: (err as Error).message }, "DexScreener request errored");
+    recordProviderFailure("dexscreener", (err as Error).message);
     return null;
   }
 }

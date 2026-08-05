@@ -1,13 +1,16 @@
 import { getMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { logger } from "../lib/logger.js";
+import { recordProviderFailure, recordProviderSuccess } from "../lib/providerHealth.js";
 import { connection } from "./rpc.js";
 import type { HolderConcentration, OnChainMintInfo } from "./types.js";
 
 export async function fetchOnChainMintInfo(mint: string): Promise<OnChainMintInfo | null> {
+  const startedAt = performance.now();
   try {
     const mintPubkey = new PublicKey(mint);
     const info = await getMint(connection, mintPubkey);
+    recordProviderSuccess("solanaRpc", performance.now() - startedAt);
     return {
       mint,
       mintAuthority: info.mintAuthority?.toBase58() ?? null,
@@ -17,6 +20,7 @@ export async function fetchOnChainMintInfo(mint: string): Promise<OnChainMintInf
     };
   } catch (err) {
     logger.warn({ mint, err: (err as Error).message }, "failed to read on-chain mint info");
+    recordProviderFailure("solanaRpc", (err as Error).message);
     return null;
   }
 }
@@ -24,12 +28,14 @@ export async function fetchOnChainMintInfo(mint: string): Promise<OnChainMintInf
 /** Top-10-holder concentration computed directly from on-chain token
  * accounts — not dependent on any third-party API. */
 export async function fetchHolderConcentration(mint: string): Promise<HolderConcentration | null> {
+  const startedAt = performance.now();
   try {
     const mintPubkey = new PublicKey(mint);
     const [largest, supply] = await Promise.all([
       connection.getTokenLargestAccounts(mintPubkey, "confirmed"),
       connection.getTokenSupply(mintPubkey, "confirmed"),
     ]);
+    recordProviderSuccess("solanaRpc", performance.now() - startedAt);
     const totalSupply = Number(supply.value.uiAmount ?? 0);
     if (totalSupply <= 0) return { top10Percentage: null, largestHolders: [] };
 
@@ -42,6 +48,7 @@ export async function fetchHolderConcentration(mint: string): Promise<HolderConc
     return { top10Percentage, largestHolders: holders };
   } catch (err) {
     logger.warn({ mint, err: (err as Error).message }, "failed to read on-chain holder concentration");
+    recordProviderFailure("solanaRpc", (err as Error).message);
     return null;
   }
 }

@@ -23,6 +23,7 @@ import logRoutes from "./routes/logs.js";
 import streamRoutes from "./routes/stream.js";
 import systemRoutes from "./routes/system.js";
 import analyticsRoutes from "./routes/analytics.js";
+import providerRoutes from "./routes/providers.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === "production";
@@ -57,6 +58,7 @@ await app.register(logRoutes, { prefix: "/api" });
 await app.register(streamRoutes, { prefix: "/api" });
 await app.register(systemRoutes, { prefix: "/api" });
 await app.register(analyticsRoutes, { prefix: "/api" });
+await app.register(providerRoutes, { prefix: "/api" });
 
 startSystemStatsSampler();
 

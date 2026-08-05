@@ -1,5 +1,6 @@
 import { env } from "../env.js";
 import { logger } from "../lib/logger.js";
+import { recordProviderFailure, recordProviderSuccess } from "../lib/providerHealth.js";
 
 export interface RoutePlanStep {
   swapInfo: { ammKey: string; label?: string; inputMint: string; outputMint: string; inAmount: string; outAmount: string };
@@ -45,16 +46,20 @@ export async function getQuote(params: GetQuoteParams): Promise<QuoteResponse | 
   url.searchParams.set("slippageBps", String(params.slippageBps));
   url.searchParams.set("swapMode", "ExactIn");
 
+  const startedAt = performance.now();
   try {
     const res = await fetch(url, { headers: jupiterHeaders() });
     if (!res.ok) {
       logger.warn({ url: url.toString(), status: res.status }, "Jupiter quote request failed");
+      recordProviderFailure("jupiter", `HTTP ${res.status}`);
       return null;
     }
     const data = (await res.json()) as Omit<QuoteResponse, "fetchedAtMs">;
+    recordProviderSuccess("jupiter", performance.now() - startedAt);
     return { ...data, fetchedAtMs: Date.now() };
   } catch (err) {
     logger.warn({ err: (err as Error).message }, "Jupiter quote request errored");
+    recordProviderFailure("jupiter", (err as Error).message);
     return null;
   }
 }

@@ -15,6 +15,7 @@ export const BOT_EVENT_NAMES = [
   "log_created",
   "risk_event_created",
   "wallet_balance_changed",
+  "provider_health_changed",
 ] as const;
 export type BotEventName = (typeof BOT_EVENT_NAMES)[number];
 

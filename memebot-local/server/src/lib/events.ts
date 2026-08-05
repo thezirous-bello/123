@@ -6,7 +6,8 @@ export type BotEventName =
   | "trade_created"
   | "log_created"
   | "risk_event_created"
-  | "wallet_balance_changed";
+  | "wallet_balance_changed"
+  | "provider_health_changed";
 
 class BotEventBus extends EventEmitter {
   emitEvent(name: BotEventName, payload: unknown) {

@@ -273,7 +273,21 @@ export const api = {
   systemStats: () => get<SystemStats>("/system"),
   equityCurve: (hours = 24) => get<EquityPoint[]>(`/analytics/equity-curve?hours=${hours}`),
   tokenHistory: (mint: string, limit = 60) => get<PricePoint[]>(`/tokens/${mint}/history?limit=${limit}`),
+  providerStatus: () => get<ProviderHealth[]>("/providers/status"),
 };
+
+export type ProviderId = "dexscreener" | "solanaRpc" | "jupiter" | "helius";
+
+export interface ProviderHealth {
+  provider: ProviderId;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  lastError: string | null;
+  consecutiveFailures: number;
+  totalCalls: number;
+  totalFailures: number;
+  lastLatencyMs: number | null;
+}
 
 export interface SystemStats {
   cpuPercent: number;
