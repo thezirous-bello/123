@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetDb } from "./testUtils.js";
 import { Decimal } from "../src/lib/decimal.js";
-import { assessFuturesEntryRisk, computeFuturesPositionSize } from "../src/futures/riskEngine.js";
+import { assessFuturesEntryRisk, computeFuturesPositionSize, maxSafeLeverageForStopDistance } from "../src/futures/riskEngine.js";
 import { FuturesStrategyConfigSchema } from "../src/futures/schema.js";
 import { createFuturesPosition, applyFuturesExit } from "../src/futures/repository.js";
 import { recordFuturesTradeOutcome, triggerFuturesEmergencyStop, resumeFuturesFromEmergencyStop } from "../src/futures/state.js";
@@ -125,6 +125,24 @@ describe("assessFuturesEntryRisk", () => {
     expect(assessFuturesEntryRisk(baseInput()).approved).toBe(false);
     resumeFuturesFromEmergencyStop("test");
     expect(assessFuturesEntryRisk(baseInput()).approved).toBe(true);
+  });
+});
+
+describe("maxSafeLeverageForStopDistance", () => {
+  it("caps leverage below 30x for the strategy's 4% max stop-loss", () => {
+    // 70% of the naive liquidation distance (100/leverage) must stay >= the stop distance.
+    const maxSafe = maxSafeLeverageForStopDistance(4);
+    expect(maxSafe).toBeLessThan(30);
+    expect(maxSafe).toBeGreaterThanOrEqual(15);
+  });
+
+  it("allows up to 30x for a tighter 3% stop-loss", () => {
+    const maxSafe = maxSafeLeverageForStopDistance(3);
+    expect(maxSafe).toBeGreaterThanOrEqual(23);
+  });
+
+  it("allows higher leverage for a tighter stop distance", () => {
+    expect(maxSafeLeverageForStopDistance(2)).toBeGreaterThan(maxSafeLeverageForStopDistance(4));
   });
 });
 

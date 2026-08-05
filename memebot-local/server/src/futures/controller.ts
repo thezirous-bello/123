@@ -4,10 +4,9 @@ import { recordLog } from "../lib/auditLog.js";
 import type { BybitMode } from "../bybit/client.js";
 import { getAllTickers, getInstrumentInfo, getKlines } from "../bybit/marketData.js";
 import { getWalletBalance, setLeverage, setTradingStop, submitMarketOrder } from "../bybit/trading.js";
-import { atr } from "../ta/indicators.js";
 import { getFuturesStrategyConfig } from "./configStore.js";
-import { pickBestCandidate, scanSymbolStage1, validateSignalStage2, type Stage1Candidate } from "./signalEngine.js";
-import { assessFuturesEntryRisk, computeFuturesPositionSize } from "./riskEngine.js";
+import { checkSetupInvalidation, pickBestCandidate, scanSymbolStage1, validateSignalStage2, type Stage1Candidate } from "./signalEngine.js";
+import { assessFuturesEntryRisk, computeFuturesPositionSize, maxSafeLeverageForStopDistance } from "./riskEngine.js";
 import { computeTrailingStopUpdate, evaluateFuturesExit } from "./tradeManager.js";
 import {
   countPendingSignals,
@@ -206,6 +205,7 @@ async function runSignalScan(mode: BybitMode) {
   const stage2 = await validateSignalStage2(best, config, mode, {
     pendingSignalsCount: countPendingSignals(),
     hasPendingForSymbol: hasPendingSignalForSymbol(best.symbol),
+    hasOpenPositionForSymbol: listOpenFuturesPositions(mode).some((p) => p.symbol === best.symbol),
     activeTradesCount: countOpenFuturesPositions(mode),
   });
 
@@ -254,7 +254,12 @@ async function tryEnterSignal(signalId: string, candidate: Stage1Candidate, conf
 
   const equityUsd = new Decimal(wallet.totalEquityUsd);
   const availableUsd = new Decimal(wallet.availableBalanceUsd);
-  const leverage = Math.min(candidate.leverage, instrument.maxLeverage);
+  const stopLossDistancePct = (Math.abs(candidate.entryPrice - candidate.stopLoss) / candidate.entryPrice) * 100;
+  // The strategy's fixed 3-4% stop-loss can outrun the liquidation safety
+  // buffer at the top of its 15-30x leverage range — clamp down to whatever
+  // leverage this specific stop distance can actually support, rather than
+  // needlessly rejecting an otherwise-good entry at the risk-engine gate.
+  const leverage = Math.min(candidate.leverage, instrument.maxLeverage, maxSafeLeverageForStopDistance(stopLossDistancePct));
 
   const sized = computeFuturesPositionSize({
     equityUsd,
@@ -269,7 +274,6 @@ async function tryEnterSignal(signalId: string, candidate: Stage1Candidate, conf
     return;
   }
 
-  const stopLossDistancePct = (Math.abs(candidate.entryPrice - candidate.stopLoss) / candidate.entryPrice) * 100;
   const risk = assessFuturesEntryRisk({
     mode,
     leverage,
@@ -367,28 +371,32 @@ async function manageOnePosition(position: FuturesPosition, mode: BybitMode) {
   const candles = await getKlines(position.symbol, 30, 20, mode, CATEGORY).catch(() => null);
   if (!candles || candles.length < 15) return;
   const currentPrice = new Decimal(candles[candles.length - 1]!.close);
-  const currentAtr = atr(candles, 14).at(-1);
 
   const config = getFuturesStrategyConfig();
 
-  if (currentAtr !== undefined && !Number.isNaN(currentAtr)) {
-    const trailingUpdate = computeTrailingStopUpdate(position, currentPrice, currentAtr, config);
-    if (trailingUpdate) {
-      updateTrailingStop(position.id, true, trailingUpdate);
-      position.trailingActive = true;
-      position.trailingStopPrice = trailingUpdate;
-    }
+  const trailingUpdate = computeTrailingStopUpdate(position, currentPrice, config);
+  if (trailingUpdate) {
+    updateTrailingStop(position.id, true, trailingUpdate);
+    position.trailingActive = true;
+    position.trailingStopPrice = trailingUpdate;
   }
 
   const decision = evaluateFuturesExit(position, currentPrice, config);
-  if (!decision || decision.closeQty.lte(0)) return;
+  if (decision && decision.closeQty.gt(0)) {
+    await executeFuturesExit(position, decision.action, decision.closeQty, currentPrice, decision.moveToBreakeven, mode);
+    return;
+  }
 
-  await executeFuturesExit(position, decision.action, decision.closeQty, currentPrice, decision.moveToBreakeven, mode);
+  const invalidation = await checkSetupInvalidation(position.symbol, position.side, config, mode).catch(() => ({ invalidated: false, reason: "Invalidation check failed — not blocking." }));
+  if (invalidation.invalidated) {
+    recordLog("warn", "futures_position", `${invalidation.reason} Exiting ${position.side.toUpperCase()} ${position.symbol} immediately.`, { positionId: position.id });
+    await executeFuturesExit(position, "invalidated", position.remainingQty, currentPrice, false, mode);
+  }
 }
 
 async function executeFuturesExit(
   position: FuturesPosition,
-  action: "stop_loss" | "trailing_stop" | "tp1" | "tp2" | "manual",
+  action: "stop_loss" | "trailing_stop" | "tp1" | "tp2" | "manual" | "invalidated",
   closeQty: Decimal,
   currentPrice: Decimal,
   moveToBreakeven: boolean,
@@ -405,7 +413,7 @@ async function executeFuturesExit(
       closedQty: closeQty,
       exitPrice: currentPrice,
       takeProfitLabelFilled: action === "tp1" ? "tp1" : action === "tp2" ? "tp2" : undefined,
-      closeReason: action === "stop_loss" || action === "trailing_stop" ? action : undefined,
+      closeReason: action === "stop_loss" || action === "trailing_stop" || action === "invalidated" ? action : undefined,
     });
 
     recordFuturesTrade({

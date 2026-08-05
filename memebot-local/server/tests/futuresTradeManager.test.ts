@@ -121,32 +121,32 @@ describe("evaluateFuturesExit — short (mirrored direction)", () => {
 describe("computeTrailingStopUpdate", () => {
   it("is null until TP2 has filled", () => {
     const position = basePosition({ takeProfitsFilled: ["tp1"] });
-    expect(computeTrailingStopUpdate(position, new Decimal(110), 2, config)).toBeNull();
+    expect(computeTrailingStopUpdate(position, new Decimal(110), config)).toBeNull();
   });
 
   it("seeds the trailing stop below price for a long, ratchets upward only", () => {
     const position = basePosition({ takeProfitsFilled: ["tp1", "tp2"], trailingStopPrice: null });
-    const seeded = computeTrailingStopUpdate(position, new Decimal(110), 2, config);
+    const seeded = computeTrailingStopUpdate(position, new Decimal(110), config);
     expect(seeded).not.toBeNull();
-    expect(seeded!.toNumber()).toBeCloseTo(110 - 2 * config.trailingAtrMultiplier, 5);
+    expect(seeded!.toNumber()).toBeCloseTo(110 * (1 - config.trailingStopPct / 100), 5);
 
-    const better = computeTrailingStopUpdate({ ...position, trailingStopPrice: seeded }, new Decimal(120), 2, config);
+    const better = computeTrailingStopUpdate({ ...position, trailingStopPrice: seeded }, new Decimal(120), config);
     expect(better!.toNumber()).toBeGreaterThan(seeded!.toNumber());
 
-    const worse = computeTrailingStopUpdate({ ...position, trailingStopPrice: seeded }, new Decimal(109), 2, config);
+    const worse = computeTrailingStopUpdate({ ...position, trailingStopPrice: seeded }, new Decimal(109), config);
     expect(worse).toBeNull();
   });
 
   it("seeds the trailing stop above price for a short, ratchets downward only", () => {
     const position = basePosition({ side: "short", takeProfitsFilled: ["tp1", "tp2"], trailingStopPrice: null });
-    const seeded = computeTrailingStopUpdate(position, new Decimal(90), 2, config);
+    const seeded = computeTrailingStopUpdate(position, new Decimal(90), config);
     expect(seeded).not.toBeNull();
-    expect(seeded!.toNumber()).toBeCloseTo(90 + 2 * config.trailingAtrMultiplier, 5);
+    expect(seeded!.toNumber()).toBeCloseTo(90 * (1 + config.trailingStopPct / 100), 5);
 
-    const better = computeTrailingStopUpdate({ ...position, trailingStopPrice: seeded }, new Decimal(80), 2, config);
+    const better = computeTrailingStopUpdate({ ...position, trailingStopPrice: seeded }, new Decimal(80), config);
     expect(better!.toNumber()).toBeLessThan(seeded!.toNumber());
 
-    const worse = computeTrailingStopUpdate({ ...position, trailingStopPrice: seeded }, new Decimal(91), 2, config);
+    const worse = computeTrailingStopUpdate({ ...position, trailingStopPrice: seeded }, new Decimal(91), config);
     expect(worse).toBeNull();
   });
 });

@@ -43,15 +43,15 @@ export function evaluateFuturesExit(position: FuturesPosition, currentPrice: Dec
   return null;
 }
 
-/** Ratchets the ATR trailing stop for the final runner tranche, active only
- * after TP2 has filled ("Let final tranche trail using ATR"). Returns the
- * new trailing-stop price only when it actually improves (never loosens
- * the stop — tightens toward price for longs, toward price for shorts too,
- * i.e. always moves in the position's favor), or null otherwise. */
-export function computeTrailingStopUpdate(position: FuturesPosition, currentPrice: Decimal, currentAtr: number, config: FuturesStrategyConfig): Decimal | null {
+/** Ratchets a fixed-percentage trailing stop for the final runner tranche,
+ * active only after TP2 has filled ("TP3: Trail remaining position with a
+ * 2% trailing stop"). Returns the new trailing-stop price only when it
+ * actually improves (never loosens the stop — always moves in the
+ * position's favor), or null otherwise. */
+export function computeTrailingStopUpdate(position: FuturesPosition, currentPrice: Decimal, config: FuturesStrategyConfig): Decimal | null {
   if (!position.takeProfitsFilled.includes("tp2")) return null;
   const isLong = position.side === "long";
-  const trailDistance = new Decimal(currentAtr * config.trailingAtrMultiplier);
+  const trailDistance = currentPrice.times(config.trailingStopPct / 100);
   const candidate = isLong ? currentPrice.minus(trailDistance) : currentPrice.plus(trailDistance);
   const existing = position.trailingStopPrice;
   if (!existing) return candidate;

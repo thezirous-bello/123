@@ -31,7 +31,7 @@ interface KlineResult {
  * is what every indicator function in ../ta/indicators.ts expects. */
 export async function getKlines(
   symbol: string,
-  intervalMinutes: 30 | 60 | 240,
+  intervalMinutes: 5 | 15 | 30 | 60 | 240,
   limit = 200,
   mode: BybitMode = "testnet",
   category: BybitCategory = DEFAULT_CATEGORY,
@@ -159,12 +159,21 @@ interface OpenInterestResult {
   list: OpenInterestRow[];
 }
 
-/** Open interest history, oldest-first, one point per day (intervalTime=1d)
- * so `openInterestVs100dAverage` can compare current OI to a trailing average. */
-export async function getOpenInterestHistory(symbol: string, days = 100, mode: BybitMode = "testnet"): Promise<Array<{ timestamp: number; openInterest: number }>> {
+export type OpenInterestIntervalTime = "5min" | "15min" | "30min" | "1h" | "4h" | "1d";
+
+/** Open interest history, oldest-first. Defaults to one point per day
+ * (intervalTime=1d) for long-window average comparisons; pass a shorter
+ * intervalTime (e.g. "15min") to detect a recent increasing/decreasing OI
+ * trend over the last couple of hours instead. */
+export async function getOpenInterestHistory(
+  symbol: string,
+  limit = 100,
+  mode: BybitMode = "testnet",
+  intervalTime: OpenInterestIntervalTime = "1d",
+): Promise<Array<{ timestamp: number; openInterest: number }>> {
   const result = await bybitGetPublic<OpenInterestResult>(
     "/v5/market/open-interest",
-    { category: "linear", symbol, intervalTime: "1d", limit: Math.min(days, 200) },
+    { category: "linear", symbol, intervalTime, limit: Math.min(limit, 200) },
     mode,
   );
   return result.list.map((row) => ({ timestamp: Number(row.timestamp), openInterest: Number(row.openInterest) })).reverse();

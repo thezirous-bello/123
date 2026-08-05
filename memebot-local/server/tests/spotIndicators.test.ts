@@ -6,13 +6,18 @@ import {
   hasBullishRsiDivergence,
   isBullishConfirmationCandle,
   isEmaFlatteningOrUpward,
+  isMakingHigherHighsHigherLows,
   isMakingLowerHighsLowerLows,
   rollingHigh,
   rollingLow,
   rsi,
+  secondLast,
   sma,
   stddevOfReturns,
   stochRsi,
+  stochRsiCrossedDown,
+  stochRsiCrossedUp,
+  vwap,
 } from "../src/ta/indicators.js";
 import type { Candle } from "../src/bybit/marketData.js";
 
@@ -175,5 +180,65 @@ describe("isBullishConfirmationCandle", () => {
 
   it("is false for a red candle", () => {
     expect(isBullishConfirmationCandle(candle(0, { open: 105, close: 100, high: 106, low: 99 }))).toBe(false);
+  });
+});
+
+describe("secondLast", () => {
+  it("returns the second-to-last element", () => {
+    expect(secondLast([1, 2, 3])).toBe(2);
+  });
+
+  it("is undefined for arrays shorter than 2", () => {
+    expect(secondLast([1])).toBeUndefined();
+  });
+});
+
+describe("vwap", () => {
+  it("equals the typical price when volume is constant and price is flat", () => {
+    const candles = Array.from({ length: 10 }, (_, i) => candle(i, { high: 102, low: 98, close: 100, volume: 500 }));
+    const series = vwap(candles, 5);
+    expect(series[9]).toBeCloseTo(100, 5);
+  });
+
+  it("weights toward the higher-volume candle's typical price", () => {
+    const candles = [candle(0, { high: 102, low: 98, close: 100, volume: 100 }), candle(1, { high: 202, low: 198, close: 200, volume: 10_000 })];
+    const series = vwap(candles, 2);
+    expect(series[1]).toBeGreaterThan(150); // pulled heavily toward the ~200 candle's huge volume
+  });
+});
+
+describe("isMakingHigherHighsHigherLows", () => {
+  // Mirror of the downtrend fixture in isMakingLowerHighsLowerLows above.
+  const uptrendPath = [65, 70, 75, 80, 85, 90, 95, 80, 92, 100, 95, 90, 95, 105, 100];
+
+  it("detects a clean uptrend/breakout structure (higher highs and higher lows)", () => {
+    const candles = uptrendPath.map((p, i) => candle(i, { high: p + 2, low: p - 2 }));
+    expect(isMakingHigherHighsHigherLows(candles, 15)).toBe(true);
+  });
+
+  it("is false for the time-reversed (downtrend) version of the same path", () => {
+    const downtrendPath = uptrendPath.slice().reverse();
+    const candles = downtrendPath.map((p, i) => candle(i, { high: p + 2, low: p - 2 }));
+    expect(isMakingHigherHighsHigherLows(candles, 15)).toBe(false);
+  });
+});
+
+describe("stochRsiCrossedUp / stochRsiCrossedDown", () => {
+  it("detects a bullish crossover: K was <= D and is now > D", () => {
+    const stoch = { k: [10, 20, 40], d: [30, 25, 25] }; // K: 20<=25 -> 40>25
+    expect(stochRsiCrossedUp(stoch)).toBe(true);
+    expect(stochRsiCrossedDown(stoch)).toBe(false);
+  });
+
+  it("detects a bearish crossover: K was >= D and is now < D", () => {
+    const stoch = { k: [40, 30, 10], d: [20, 25, 25] }; // K: 30>=25 -> 10<25
+    expect(stochRsiCrossedDown(stoch)).toBe(true);
+    expect(stochRsiCrossedUp(stoch)).toBe(false);
+  });
+
+  it("is false when K and D move together with no crossover", () => {
+    const stoch = { k: [40, 45, 50], d: [20, 25, 30] };
+    expect(stochRsiCrossedUp(stoch)).toBe(false);
+    expect(stochRsiCrossedDown(stoch)).toBe(false);
   });
 });

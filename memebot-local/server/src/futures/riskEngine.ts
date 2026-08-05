@@ -30,6 +30,20 @@ function check(name: string, passed: boolean, detail: string): FuturesRiskCheck 
 // "position gets liquidated before the stop-loss can fire."
 const LIQUIDATION_SAFETY_FACTOR = 0.7; // stop must trigger within 70% of the naive liquidation distance
 
+/** Largest leverage for which a given fixed stop-loss distance still stays
+ * inside the liquidation safety buffer above. The new strategy's stop-loss
+ * is a fixed 3-4% (not ATR-scaled), so at the high end of that band (4%)
+ * the strategy's own 15-30x leverage range would routinely fail
+ * `liquidation_safety_buffer` — 30x's naive liquidation distance is only
+ * ~3.33%, and 70% of that (~2.33%) is tighter than a 4% stop. Rather than
+ * silently rejecting otherwise-good entries, the controller calls this to
+ * clamp the chosen leverage down to whatever the actual stop distance can
+ * safely support, still within [minLeverage, maxLeverage]. */
+export function maxSafeLeverageForStopDistance(stopLossDistancePct: number): number {
+  if (stopLossDistancePct <= 0) return Infinity;
+  return Math.floor((100 * LIQUIDATION_SAFETY_FACTOR) / stopLossDistancePct);
+}
+
 export interface FuturesEntryRiskInput {
   mode: BybitMode;
   leverage: number;

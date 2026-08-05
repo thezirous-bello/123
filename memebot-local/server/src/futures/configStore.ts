@@ -1,4 +1,5 @@
 import { db, nowIso } from "../db/index.js";
+import { logger } from "../lib/logger.js";
 import { FuturesStrategyConfigSchema, type FuturesStrategyConfig } from "./schema.js";
 
 const SETTINGS_KEY = "futures_strategy_config";
@@ -10,13 +11,14 @@ export function getFuturesStrategyConfig(): FuturesStrategyConfig {
     saveFuturesStrategyConfig(defaults);
     return defaults;
   }
-  const parsed = FuturesStrategyConfigSchema.parse(JSON.parse(row.value));
-  // See spot/configStore.ts's getSpotStrategyConfig for why this one-time
-  // upgrade exists — same issue, same narrow fix.
-  if (parsed.symbolUniverse === "auto" && parsed.autoTopNByVolume === 30) {
-    return saveFuturesStrategyConfig({ ...parsed, symbolUniverse: "all" });
-  }
-  return parsed;
+  const result = FuturesStrategyConfigSchema.safeParse(JSON.parse(row.value));
+  if (result.success) return result.data;
+  // A saved config from a previous strategy version (the schema is
+  // .strict(), so field-set changes always fail here) — reset to the
+  // current strategy's defaults rather than crash the bot on startup.
+  logger.warn({ issues: result.error.issues }, "Saved futures strategy config no longer matches the current schema — resetting to defaults.");
+  const defaults = FuturesStrategyConfigSchema.parse({});
+  return saveFuturesStrategyConfig(defaults);
 }
 
 export function saveFuturesStrategyConfig(config: FuturesStrategyConfig): FuturesStrategyConfig {

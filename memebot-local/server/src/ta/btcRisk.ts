@@ -51,3 +51,21 @@ export async function checkBtcVolatilityShock(mode: BybitMode): Promise<BtcVolat
 export function summarizeCandle(candle: Candle): string {
   return `O:${candle.open} H:${candle.high} L:${candle.low} C:${candle.close}`;
 }
+
+/** New LONG & SHORT strategy's own explicit "Avoid Trading: Sudden BTC
+ * moves larger than 3%" rule — distinct from checkBtcVolatilityShock's
+ * news/event proxy above. Looks at BTC's raw close-to-close move over the
+ * last hour of 5-minute candles. */
+export async function checkBtcSuddenMove(mode: BybitMode, maxMovePct: number): Promise<BtcVolatilityCheck> {
+  const candles = await getKlines("BTCUSDT", 5, 12, mode);
+  if (candles.length < 3) {
+    return { flagged: false, detail: "Not enough BTC 5m history to evaluate — not blocking." };
+  }
+  const first = candles[0]!.close;
+  const lastClose = candles[candles.length - 1]!.close;
+  const movePct = first > 0 ? (Math.abs(lastClose - first) / first) * 100 : 0;
+  if (movePct > maxMovePct) {
+    return { flagged: true, detail: `BTC moved ${movePct.toFixed(2)}% over the last hour (5m candles) — exceeds the ${maxMovePct}% sudden-move threshold.` };
+  }
+  return { flagged: false, detail: `BTC moved ${movePct.toFixed(2)}% over the last hour — within the ${maxMovePct}% sudden-move threshold.` };
+}

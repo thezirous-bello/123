@@ -283,3 +283,69 @@ export function isBelowOrRejecting200Ema(closes: number[], ema200: number[], loo
 export function last<T>(values: T[]): T | undefined {
   return values[values.length - 1];
 }
+
+export function secondLast<T>(values: T[]): T | undefined {
+  return values[values.length - 2];
+}
+
+/** Rolling VWAP over the trailing `period` candles (typical price weighted
+ * by volume) — not a session-anchored VWAP, since these bots run
+ * continuously with no natural session boundary. Used as one of the three
+ * "pulled back to" reference levels (VWAP / EMA20 / support-resistance) in
+ * the futures bot's entry logic. */
+export function vwap(candles: Candle[], period: number): number[] {
+  const out = new Array(candles.length).fill(NaN);
+  for (let i = 0; i < candles.length; i++) {
+    if (i < period - 1) continue;
+    let pv = 0;
+    let vol = 0;
+    for (const c of candles.slice(i - period + 1, i + 1)) {
+      pv += ((c.high + c.low + c.close) / 3) * c.volume;
+      vol += c.volume;
+    }
+    out[i] = vol > 0 ? pv / vol : NaN;
+  }
+  return out;
+}
+
+/** Mirror of isMakingLowerHighsLowerLows: true if swing structure is making
+ * higher highs AND higher lows, i.e. a real uptrend/breakout structure
+ * rather than a range. */
+export function isMakingHigherHighsHigherLows(candles: Candle[], lookback = 30): boolean {
+  const recent = candles.slice(-lookback);
+  if (recent.length < 10) return false;
+  const swingHighs: number[] = [];
+  const swingLows: number[] = [];
+  for (let i = 2; i < recent.length - 2; i++) {
+    const c = recent[i]!;
+    const window = recent.slice(i - 2, i + 3);
+    if (c.high === Math.max(...window.map((w) => w.high))) swingHighs.push(c.high);
+    if (c.low === Math.min(...window.map((w) => w.low))) swingLows.push(c.low);
+  }
+  if (swingHighs.length < 2 || swingLows.length < 2) return false;
+  const higherHighs = swingHighs[swingHighs.length - 1]! > swingHighs[swingHighs.length - 2]!;
+  const higherLows = swingLows[swingLows.length - 1]! > swingLows[swingLows.length - 2]!;
+  return higherHighs && higherLows;
+}
+
+/** True if %K crossed above %D on the most recent candle (bullish StochRSI
+ * crossover) — the prior candle had K<=D and the current one has K>D. */
+export function stochRsiCrossedUp(stoch: StochRsiResult): boolean {
+  const k0 = secondLast(stoch.k);
+  const d0 = secondLast(stoch.d);
+  const k1 = last(stoch.k);
+  const d1 = last(stoch.d);
+  if ([k0, d0, k1, d1].some((v) => v === undefined || Number.isNaN(v))) return false;
+  return k0! <= d0! && k1! > d1!;
+}
+
+/** True if %K crossed below %D on the most recent candle (bearish StochRSI
+ * crossover). */
+export function stochRsiCrossedDown(stoch: StochRsiResult): boolean {
+  const k0 = secondLast(stoch.k);
+  const d0 = secondLast(stoch.d);
+  const k1 = last(stoch.k);
+  const d1 = last(stoch.d);
+  if ([k0, d0, k1, d1].some((v) => v === undefined || Number.isNaN(v))) return false;
+  return k0! >= d0! && k1! < d1!;
+}

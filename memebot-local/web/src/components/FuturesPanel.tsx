@@ -419,33 +419,33 @@ function ConfigEditor({ config, busy, onSave }: { config: FuturesStrategyConfig;
       </div>
 
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">Shared Stage 1 filters</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">Coin selection (Trend=4H / Entry=15M / Confirmation=5M)</h4>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {field("atrOverCloseMax", "Max ATR/Close")}
-          {field("maxSpreadPct", "Max spread %")}
           {field("min24hTurnoverUsd", "Min 24h turnover $", 100000)}
-          {field("entryZoneNearPct", "Entry zone near %")}
-          {field("entryZoneFarPct", "Entry zone far %")}
-          {field("slAtrMultiplier", "SL ATR mult")}
-          {field("maxStopLossDistancePct", "Max SL distance %")}
+          {field("minDailyMovePct", "Min daily move %", 1)}
+          {field("maxSpreadPct", "Max spread %")}
+          {field("atrOverCloseMax", "Max ATR/Close")}
+          {field("trendEma4hPeriod", "4H trend EMA period", 1)}
+          {field("entryEmaPeriod", "15M entry EMA period", 1)}
+          {field("supportResistanceLookback", "Support/resistance lookback", 1)}
           {field("minRiskReward", "Min risk:reward")}
         </div>
       </div>
 
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">LONG setup</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">LONG setup (pulls back to VWAP/EMA20/support)</h4>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {field("stochRsiLongKMax", "Max StochRSI K", 1)}
+          {field("pullbackMaxDistancePct", "Pullback max distance %")}
           {field("rsiLongMin", "Min RSI", 1)}
           {field("rsiLongMax", "Max RSI", 1)}
+          {field("volumeSpikeMultiplier", "Volume spike x")}
           {field("fundingLongMaxPct", "Max funding rate %")}
         </div>
       </div>
 
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">SHORT setup</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">SHORT setup (rejects VWAP/EMA20/resistance)</h4>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {field("stochRsiShortKMin", "Min StochRSI K", 1)}
           {field("rsiShortMin", "Min RSI", 1)}
           {field("rsiShortMax", "Max RSI", 1)}
           {field("fundingShortMinPct", "Min funding rate %")}
@@ -457,8 +457,9 @@ function ConfigEditor({ config, busy, onSave }: { config: FuturesStrategyConfig;
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {field("maxPendingSignals", "Max pending signals", 1)}
           {field("maxActiveTrades", "Max active trades", 1)}
-          {field("fearGreedLongPreferAbove", "F&G long prefer above", 1)}
-          {field("fearGreedShortPreferBelow", "F&G short prefer below", 1)}
+          {field("fearGreedLongThreshold", "F&G > prefers LONG", 1)}
+          {field("fearGreedShortThreshold", "F&G < prefers SHORT", 1)}
+          {field("btcSuddenMoveMaxPct", "Max sudden BTC move %")}
           {field("entryPriceMaxDriftPct", "Max entry drift %")}
           {field("signalExpiryMinutes", "Signal expiry (min)", 1)}
         </div>
@@ -483,11 +484,15 @@ function ConfigEditor({ config, busy, onSave }: { config: FuturesStrategyConfig;
       </div>
 
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">Trade management</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">Trade management (SL 3-4% hard stop, TP1 +5%, TP2 +10%, TP3 trails)</h4>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {field("slMinPct", "Min stop-loss %")}
+          {field("slMaxPct", "Max stop-loss %")}
+          {field("tp1Pct", "TP1 %")}
+          {field("tp2Pct", "TP2 %")}
           {field("tp1ClosePct", "TP1 close %", 1)}
           {field("tp2ClosePct", "TP2 close %", 1)}
-          {field("trailingAtrMultiplier", "Trailing ATR mult")}
+          {field("trailingStopPct", "TP3 trailing stop %")}
           {field("stopAfterConsecutiveLosses", "Halt after N losses", 1)}
           {field("dailyMaxLossPct", "Daily max loss %")}
         </div>

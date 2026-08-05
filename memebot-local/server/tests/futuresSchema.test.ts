@@ -2,15 +2,22 @@ import { describe, expect, it } from "vitest";
 import { confidenceFromScore, FuturesStrategyConfigSchema, leverageForConfidence, positionSizePctForConfidence } from "../src/futures/schema.js";
 
 describe("FuturesStrategyConfigSchema", () => {
-  it("parses to defaults matching the LONG & SHORT strategy spec's stated risk profile", () => {
+  it("parses to defaults matching the HIGH-RISK LONG & SHORT strategy spec's stated risk profile", () => {
     const config = FuturesStrategyConfigSchema.parse({});
     expect(config.minLeverage).toBe(15);
     expect(config.maxLeverage).toBe(30);
     expect(config.minPositionSizePct).toBe(20);
     expect(config.maxPositionSizePct).toBe(50);
-    expect(config.tp1Pct).toBe(2);
-    expect(config.tp2Pct).toBe(4);
+    expect(config.slMinPct).toBe(3);
+    expect(config.slMaxPct).toBe(4);
+    expect(config.tp1Pct).toBe(5);
+    expect(config.tp2Pct).toBe(10);
+    expect(config.trailingStopPct).toBe(2);
+    expect(config.maxActiveTrades).toBe(3);
     expect(config.dailyMaxLossPct).toBe(8);
+    expect(config.fearGreedLongThreshold).toBe(60);
+    expect(config.fearGreedShortThreshold).toBe(40);
+    expect(config.minDailyMovePct).toBe(8);
   });
 
   it("rejects a confidence-tier leverage value outside [minLeverage, maxLeverage]", () => {
@@ -30,6 +37,16 @@ describe("FuturesStrategyConfigSchema", () => {
 
   it("rejects tp1ClosePct + tp2ClosePct over 100%", () => {
     const result = FuturesStrategyConfigSchema.safeParse({ tp1ClosePct: 70, tp2ClosePct: 40 });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects slMinPct greater than slMaxPct", () => {
+    const result = FuturesStrategyConfigSchema.safeParse({ slMinPct: 5, slMaxPct: 3 });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects fearGreedShortThreshold greater than fearGreedLongThreshold", () => {
+    const result = FuturesStrategyConfigSchema.safeParse({ fearGreedShortThreshold: 70, fearGreedLongThreshold: 60 });
     expect(result.success).toBe(false);
   });
 
