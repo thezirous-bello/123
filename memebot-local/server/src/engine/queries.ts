@@ -67,6 +67,14 @@ export function openPositionForMint(mint: string, mode: Mode) {
     | undefined;
 }
 
+/** True if a mint has an open position in EITHER paper or live mode — used
+ * to decide whether a watchlist entry is safe to evict when making room
+ * for freshly discovered tokens (never evict something currently held). */
+export function hasOpenPositionAnyMode(mint: string): boolean {
+  const row = db.prepare("SELECT 1 FROM positions WHERE mint = ? AND status = 'open' LIMIT 1").get(mint);
+  return !!row;
+}
+
 export function totalOpenExposureUsd(mode: Mode): Decimal {
   const rows = db.prepare("SELECT cost_basis_usd FROM positions WHERE status = 'open' AND mode = ?").all(mode) as Array<{
     cost_basis_usd: string;

@@ -20,23 +20,49 @@ import { getPosition, listOpenPositions, updateTrailingHigh, type Position } fro
 import { getSolBalance } from "../wallet/walletManager.js";
 import { getRiskLimits } from "../lib/settings.js";
 import { getSolUsdPrice } from "../market/pricing.js";
-import { openPositionForMint, type Mode } from "./queries.js";
+import { hasOpenPositionAnyMode, openPositionForMint, type Mode } from "./queries.js";
+import { removeFromWatchlist } from "../market/watchlist.js";
 import type { StrategyRules } from "../strategy/schema.js";
+import type { SecurityReport } from "../security/tokenSecurity.js";
+import type { TokenSnapshot, OnChainMintInfo } from "../market/types.js";
+import type { EntryCondition } from "./strategyEvaluator.js";
 
 const TICK_INTERVAL_MS = 20_000;
 // How often to pull fresh candidate tokens from DexScreener's public
 // trending/boosted feeds. Kept well below their rate limits — this is a
 // discovery pass, not per-tick traffic.
-const DISCOVERY_INTERVAL_MS = 5 * 60_000;
+const DISCOVERY_INTERVAL_MS = 3 * 60_000;
 // Caps how many tokens the bot will track at once, whether added manually
-// or discovered automatically, so neither the UI nor the provider requests
-// grow unbounded. Discovery skips adding more once this is hit.
-const MAX_WATCHLIST_SIZE = 60;
+// or discovered automatically. Once at capacity, discovery evicts the
+// oldest entries that have no open position to make room for fresh ones —
+// so the watchlist keeps turning over instead of filling up once and
+// freezing. Real ceiling here is provider rate limits (DexScreener, Jupiter,
+// and especially the Solana RPC), not this number — see SCAN_CONCURRENCY.
+const MAX_WATCHLIST_SIZE = 150;
+// How many tokens get scanned (market data + on-chain checks + security
+// analysis) at once per tick, instead of strictly one-at-a-time. Higher is
+// faster but hits the free public Solana RPC's rate limit harder — if
+// you've set a Helius (or other paid) RPC URL, this can safely go higher.
+const SCAN_CONCURRENCY = 5;
 
 let tickHandle: NodeJS.Timeout | null = null;
 let tickCounter = 0;
 let tickInFlight = false;
 let lastDiscoveryAtMs = 0;
+
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (true) {
+      const i = nextIndex++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i] as T);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
 
 export function startBot(): BotState {
   const state = setRunning(true);
@@ -111,34 +137,48 @@ async function runTick() {
  * within DexScreener's free-tier rate limits, and always fires once
  * immediately after startup.
  */
-export async function runAutoDiscovery(): Promise<{ added: number; candidates: number }> {
-  const candidates = await discoverTrendingSolanaMints(30);
+export async function runAutoDiscovery(): Promise<{ added: number; candidates: number; evicted: number }> {
+  const candidates = await discoverTrendingSolanaMints(80);
   if (candidates.length === 0) {
-    return { added: 0, candidates: 0 };
+    return { added: 0, candidates: 0, evicted: 0 };
   }
 
   const current = listWatchlist();
-  if (current.length >= MAX_WATCHLIST_SIZE) {
-    recordLog("debug", "discovery", `Watchlist at capacity (${MAX_WATCHLIST_SIZE}) — skipping new discoveries this round.`);
-    return { added: 0, candidates: candidates.length };
+  const currentMints = new Set(current.map((c) => c.mint));
+  const newMints = candidates.filter((mint) => !currentMints.has(mint));
+
+  // Make room for new discoveries by recycling out the oldest entries that
+  // aren't currently held as an open position — never evicts something the
+  // bot actually has money in.
+  let evicted = 0;
+  const roomNeeded = current.length + newMints.length - MAX_WATCHLIST_SIZE;
+  if (roomNeeded > 0) {
+    const evictable = current.filter((c) => !c.blocked && !hasOpenPositionAnyMode(c.mint)).sort((a, b) => a.addedAt.localeCompare(b.addedAt));
+    for (const entry of evictable) {
+      if (evicted >= roomNeeded) break;
+      removeFromWatchlist(entry.mint);
+      evicted += 1;
+    }
   }
 
-  const currentMints = new Set(current.map((c) => c.mint));
+  const capacityRemaining = Math.max(0, MAX_WATCHLIST_SIZE - (current.length - evicted));
   let added = 0;
-  for (const mint of candidates) {
-    if (currentMints.has(mint)) continue;
-    if (current.length + added >= MAX_WATCHLIST_SIZE) break;
+  for (const mint of newMints) {
+    if (added >= capacityRemaining) break;
     addToWatchlist(mint, null, null);
     added += 1;
   }
 
-  if (added > 0) {
-    recordLog("info", "discovery", `Auto-discovered ${added} new Solana token(s) from DexScreener's trending/boosted feeds.`, {
-      added,
-      candidates: candidates.length,
-    });
+  if (added > 0 || evicted > 0) {
+    recordLog(
+      "info",
+      "discovery",
+      `Auto-discovered ${added} new Solana token(s) from DexScreener's trending/boosted feeds` +
+        (evicted > 0 ? ` (recycled out ${evicted} stale watchlist entr${evicted === 1 ? "y" : "ies"} to make room).` : "."),
+      { added, evicted, candidates: candidates.length },
+    );
   }
-  return { added, candidates: candidates.length };
+  return { added, candidates: candidates.length, evicted };
 }
 
 async function maybeRunAutoDiscovery() {
@@ -163,14 +203,30 @@ async function tick(mode: Mode) {
   if (!strategy || !strategy.enabled) return;
 
   const limits = getRiskLimits();
-  const openCount = listOpenPositions(mode).length;
-  if (openCount >= limits.maxOpenPositions) return;
+  if (listOpenPositions(mode).length >= limits.maxOpenPositions) return;
 
-  const watchlist = listWatchlist().filter((w) => !w.blocked);
-  for (const entry of watchlist) {
+  const watchlist = listWatchlist()
+    .filter((w) => !w.blocked)
+    .filter((w) => !openPositionForMint(w.mint, mode));
+
+  // The expensive, parallelizable part: fetch market data + on-chain checks
+  // + run security analysis for every watched token at once (bounded by
+  // SCAN_CONCURRENCY), instead of one token fully round-tripping before the
+  // next even starts. This is what lets a larger watchlist actually get
+  // revisited at a reasonable cadence instead of trickling through
+  // sequentially.
+  const scans = await mapWithConcurrency(watchlist, SCAN_CONCURRENCY, (entry) => scanToken(strategy.rules, entry.mint));
+
+  // The cheap, sequential part: only tokens that already passed scanning
+  // reach here, and this loop stays single-threaded on purpose — it's the
+  // part that actually checks risk limits and commits a trade, and doing
+  // that concurrently would let two tokens both "see" the same open-position
+  // count and both buy, blowing past maxOpenPositions.
+  for (const scan of scans) {
+    if (!scan || !scan.passed) continue;
     if (listOpenPositions(mode).length >= limits.maxOpenPositions) break;
-    if (openPositionForMint(entry.mint, mode)) continue;
-    await evaluateAndMaybeEnter(mode, strategy.id, strategy.rules, entry.mint);
+    if (openPositionForMint(scan.mint, mode)) continue; // could have been opened moments ago
+    await tryEnterFromScan(mode, strategy.id, strategy.rules, scan);
   }
 }
 
@@ -220,15 +276,29 @@ async function executeExit(mode: Mode, position: Position, sellAmount: Decimal, 
   }
 }
 
-async function evaluateAndMaybeEnter(mode: Mode, strategyId: string, rules: StrategyRules, mint: string) {
+interface TokenScanPass {
+  mint: string;
+  passed: boolean;
+  snapshot: TokenSnapshot;
+  onchain: OnChainMintInfo | null;
+  security: SecurityReport;
+  sellRoute: { exists: boolean; priceImpactPct: number | null } | null;
+  allConditions: EntryCondition[];
+}
+
+/** The parallelizable half of entry evaluation: fetch market data, on-chain
+ * checks, and security analysis for one token, and log the resulting
+ * signal/rejection. Never touches the risk engine or places a trade — safe
+ * to run many of these concurrently via mapWithConcurrency. */
+async function scanToken(rules: StrategyRules, mint: string): Promise<TokenScanPass | null> {
   const snapshot = await getFreshTokenSnapshot(mint);
   if (!snapshot) {
     recordLog("debug", "strategy_evaluation", `No market data for ${mint} — skipped`, { mint });
-    return;
+    return null;
   }
   if (!isSnapshotFresh(snapshot)) {
     recordLog("warn", "strategy_evaluation", `Stale market data for ${mint} — skipped`, { mint, maxAgeSeconds: MAX_SNAPSHOT_AGE_SECONDS });
-    return;
+    return null;
   }
 
   const [onchain, holders] = await Promise.all([fetchOnChainMintInfo(mint), fetchHolderConcentration(mint)]);
@@ -247,7 +317,7 @@ async function evaluateAndMaybeEnter(mode: Mode, strategyId: string, rules: Stra
       mint,
       findings: security.findings,
     });
-    return;
+    return null;
   }
 
   const entryEval = evaluateEntryConditions(rules, snapshot, security);
@@ -260,10 +330,17 @@ async function evaluateAndMaybeEnter(mode: Mode, strategyId: string, rules: Stra
     "info",
     "strategy_evaluation",
     passed ? `Signal: ${snapshot.symbol ?? mint}` : `Rejected ${snapshot.symbol ?? mint}: ${firstFailure?.detail ?? "unknown reason"}`,
-    { mint, strategyId, conditions: allConditions, snapshot },
+    { mint, conditions: allConditions, snapshot },
   );
 
-  if (!passed) return;
+  return { mint, passed, snapshot, onchain, security, sellRoute, allConditions };
+}
+
+/** The sequential half: given a token that already passed scanning, run it
+ * through the risk engine and place the trade if approved. Always called
+ * one at a time from tick() — see the comment there for why. */
+async function tryEnterFromScan(mode: Mode, strategyId: string, rules: StrategyRules, scan: TokenScanPass) {
+  const { mint, snapshot, onchain, security, sellRoute, allConditions } = scan;
 
   const account = getPaperAccount();
   const equityUsd = mode === "paper" ? accountEquityUsd(account.cashBalanceUsd, "paper") : await estimateLiveEquityUsd();
