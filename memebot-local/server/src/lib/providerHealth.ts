@@ -1,6 +1,6 @@
 import { botEvents } from "./events.js";
 
-export type ProviderId = "dexscreener" | "solanaRpc" | "jupiter" | "helius";
+export type ProviderId = "dexscreener" | "solanaRpc" | "jupiter" | "helius" | "bybit" | "fearGreed";
 
 export interface ProviderHealthState {
   provider: ProviderId;

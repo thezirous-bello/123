@@ -11,6 +11,9 @@ const TABLES = [
   "risk_events",
   "bot_logs",
   "settings",
+  "futures_trades",
+  "futures_positions",
+  "futures_signals",
 ];
 
 /** Wipes all rows (schema stays) so each test starts from a clean, known
@@ -23,6 +26,9 @@ export function resetDb(): void {
   db.prepare("UPDATE paper_account SET starting_balance_usd = '1000', cash_balance_usd = '1000', updated_at = ? WHERE id = 1").run(now);
   db.prepare(
     "UPDATE bot_state SET running = 0, mode = 'paper', active_strategy_id = NULL, emergency_stopped = 0, emergency_stopped_at = NULL, emergency_stopped_reason = NULL, updated_at = ? WHERE id = 1",
+  ).run(now);
+  db.prepare(
+    "UPDATE futures_bot_state SET running = 0, mode = 'testnet', emergency_stopped = 0, emergency_stopped_at = NULL, emergency_stopped_reason = NULL, consecutive_losses = 0, trading_halted_until = NULL, updated_at = ? WHERE id = 1",
   ).run(now);
 }
 

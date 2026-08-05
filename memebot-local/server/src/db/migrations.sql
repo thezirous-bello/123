@@ -178,3 +178,90 @@ CREATE TABLE IF NOT EXISTS bot_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_bot_logs_created ON bot_logs (created_at);
+
+-- ============================================================
+-- Bybit futures bot — fully independent from the Solana bot above.
+-- Shares only `settings`, `bot_logs`, and `risk_events` (via distinct
+-- category/type prefixes) so both bots show up in one audit trail.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS futures_bot_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  running INTEGER NOT NULL DEFAULT 0,
+  mode TEXT NOT NULL DEFAULT 'testnet' CHECK (mode IN ('testnet', 'live')),
+  emergency_stopped INTEGER NOT NULL DEFAULT 0,
+  emergency_stopped_at TEXT,
+  emergency_stopped_reason TEXT,
+  emergency_stopped_by TEXT,
+  consecutive_losses INTEGER NOT NULL DEFAULT 0,
+  trading_halted_until TEXT,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS futures_signals (
+  id TEXT PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  side TEXT NOT NULL CHECK (side IN ('long', 'short')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'active', 'filled', 'cancelled', 'expired')) DEFAULT 'pending',
+  entry_price TEXT NOT NULL,
+  stop_loss TEXT NOT NULL,
+  take_profits_json TEXT NOT NULL DEFAULT '[]',
+  score TEXT NOT NULL,
+  stage1_json TEXT NOT NULL DEFAULT '{}',
+  stage2_json TEXT NOT NULL DEFAULT '{}',
+  cancelled_reason TEXT,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_futures_signals_status ON futures_signals (status, created_at);
+CREATE INDEX IF NOT EXISTS idx_futures_signals_symbol ON futures_signals (symbol);
+
+CREATE TABLE IF NOT EXISTS futures_positions (
+  id TEXT PRIMARY KEY,
+  signal_id TEXT REFERENCES futures_signals (id) ON DELETE SET NULL,
+  symbol TEXT NOT NULL,
+  side TEXT NOT NULL CHECK (side IN ('long', 'short')),
+  mode TEXT NOT NULL CHECK (mode IN ('testnet', 'live')),
+  status TEXT NOT NULL CHECK (status IN ('open', 'closed')) DEFAULT 'open',
+  leverage INTEGER NOT NULL,
+  entry_price TEXT NOT NULL,
+  qty TEXT NOT NULL,
+  remaining_qty TEXT NOT NULL,
+  notional_usd TEXT NOT NULL,
+  margin_usd TEXT NOT NULL,
+  stop_loss TEXT NOT NULL,
+  take_profits_json TEXT NOT NULL DEFAULT '[]',
+  take_profits_filled_json TEXT NOT NULL DEFAULT '[]',
+  breakeven_moved INTEGER NOT NULL DEFAULT 0,
+  trailing_active INTEGER NOT NULL DEFAULT 0,
+  trailing_stop_price TEXT,
+  bybit_order_id TEXT,
+  realized_pnl_usd TEXT NOT NULL DEFAULT '0',
+  close_reason TEXT,
+  opened_at TEXT NOT NULL,
+  closed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_futures_positions_status ON futures_positions (status, mode);
+CREATE INDEX IF NOT EXISTS idx_futures_positions_symbol ON futures_positions (symbol);
+
+CREATE TABLE IF NOT EXISTS futures_trades (
+  id TEXT PRIMARY KEY,
+  position_id TEXT REFERENCES futures_positions (id) ON DELETE SET NULL,
+  symbol TEXT NOT NULL,
+  side TEXT NOT NULL CHECK (side IN ('open_long', 'open_short', 'close_long', 'close_short')),
+  mode TEXT NOT NULL CHECK (mode IN ('testnet', 'live')),
+  qty TEXT NOT NULL,
+  price_usd TEXT NOT NULL,
+  notional_usd TEXT NOT NULL,
+  fee_usd TEXT NOT NULL DEFAULT '0',
+  bybit_order_id TEXT,
+  status TEXT NOT NULL CHECK (status IN ('simulated', 'submitted', 'confirmed', 'failed')),
+  failure_reason TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_futures_trades_position ON futures_trades (position_id);
+CREATE INDEX IF NOT EXISTS idx_futures_trades_created ON futures_trades (created_at);

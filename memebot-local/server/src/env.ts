@@ -31,6 +31,20 @@ const EnvSchema = z.object({
     .optional()
     .transform((v) => v === "true")
     .pipe(z.boolean()),
+
+  // Bybit futures bot — completely separate credentials/wallet from the
+  // Solana meme-coin bot above. Testnet keys are used by default; mainnet
+  // keys are only ever touched when FUTURES_LIVE_TRADING_ENABLED=true AND
+  // the dashboard sends an explicit confirmation, mirroring LIVE_TRADING_ENABLED.
+  BYBIT_TESTNET_API_KEY: z.string().optional(),
+  BYBIT_TESTNET_API_SECRET: z.string().optional(),
+  BYBIT_API_KEY: z.string().optional(),
+  BYBIT_API_SECRET: z.string().optional(),
+  FUTURES_LIVE_TRADING_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === "true")
+    .pipe(z.boolean()),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -51,3 +65,6 @@ export const env = loadEnv();
 
 /** Whether live (real-money) trading is permitted at all by server configuration. */
 export const liveTradingAllowedByConfig = env.LIVE_TRADING_ENABLED === true;
+
+/** Whether live (mainnet, real-money) futures trading is permitted at all by server configuration. */
+export const futuresLiveTradingAllowedByConfig = env.FUTURES_LIVE_TRADING_ENABLED === true;

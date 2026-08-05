@@ -11,14 +11,17 @@ import { PnLSummary } from "./components/PnLSummary.js";
 import { RiskSettings } from "./components/RiskSettings.js";
 import { LogsPanel } from "./components/LogsPanel.js";
 import { LiveFeed } from "./components/LiveFeed.js";
+import { FuturesPanel } from "./components/FuturesPanel.js";
 
 const TABS = ["Dashboard", "Live", "Strategy", "Scanner", "Positions", "History", "Risk", "Logs"] as const;
 type Tab = (typeof TABS)[number];
+type BotKind = "meme" | "futures";
 
 export default function App() {
   const tick = useRefreshSignal();
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [tab, setTab] = useState<Tab>("Dashboard");
+  const [botKind, setBotKind] = useState<BotKind>("meme");
 
   useEffect(() => {
     api.status().then(setStatus).catch(() => {});
@@ -62,7 +65,24 @@ export default function App() {
         </div>
       )}
 
-      {tab === "Live" && <LiveFeed running={status?.running ?? false} mode={status?.mode ?? "paper"} />}
+      {tab === "Live" && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1 w-fit">
+            {(["meme", "futures"] as const).map((kind) => (
+              <button
+                key={kind}
+                onClick={() => setBotKind(kind)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  botKind === kind ? "bg-violet-600 text-white" : "text-white/60 hover:bg-white/10"
+                }`}
+              >
+                {kind === "meme" ? "Meme Coins (Solana)" : "Bybit Futures"}
+              </button>
+            ))}
+          </div>
+          {botKind === "meme" ? <LiveFeed running={status?.running ?? false} mode={status?.mode ?? "paper"} /> : <FuturesPanel />}
+        </div>
+      )}
       {tab === "Strategy" && <StrategyPanel />}
       {tab === "Scanner" && <TokenScanner />}
       {tab === "Positions" && (

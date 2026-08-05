@@ -39,6 +39,15 @@ function runMigrations() {
     ).run(now);
   }
 
+  const futuresState = db.prepare("SELECT id FROM futures_bot_state WHERE id = 1").get();
+  if (!futuresState) {
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO futures_bot_state (id, running, mode, emergency_stopped, consecutive_losses, updated_at)
+       VALUES (1, 0, 'testnet', 0, 0, ?)`,
+    ).run(now);
+  }
+
   logger.info({ dbPath }, "database ready");
 }
 

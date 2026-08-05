@@ -274,7 +274,162 @@ export const api = {
   equityCurve: (hours = 24) => get<EquityPoint[]>(`/analytics/equity-curve?hours=${hours}`),
   tokenHistory: (mint: string, limit = 60) => get<PricePoint[]>(`/tokens/${mint}/history?limit=${limit}`),
   providerStatus: () => get<ProviderHealth[]>("/providers/status"),
+
+  futuresStatus: () => get<FuturesStatus>("/futures/status"),
+  futuresWallet: (mode?: BybitMode) => get<FuturesWallet>(`/futures/wallet${mode ? `?mode=${mode}` : ""}`),
+  futuresConfig: () => get<FuturesStrategyConfig>("/futures/config"),
+  updateFuturesConfig: (patchBody: Partial<FuturesStrategyConfig>) => patch<FuturesStrategyConfig>("/futures/config", patchBody),
+  futuresStart: () => post("/futures/control/start"),
+  futuresStop: () => post("/futures/control/stop"),
+  futuresSetMode: (mode: BybitMode, confirmed: boolean) => post("/futures/control/mode", { mode, confirmed }),
+  futuresEmergencyStop: (reason: string) => post("/futures/control/emergency-stop", { reason }),
+  futuresResume: () => post("/futures/control/resume", { confirm: true }),
+  futuresSignals: () => get<FuturesSignal[]>("/futures/signals"),
+  futuresPositions: (mode?: BybitMode) => get<FuturesPosition[]>(`/futures/positions${mode ? `?mode=${mode}` : ""}`),
+  futuresTrades: () => get<FuturesTrade[]>("/futures/trades"),
+  closeFuturesPosition: (id: string) => post(`/futures/positions/${id}/close`),
 };
+
+// ---- Bybit futures bot types ----
+
+export type BybitMode = "testnet" | "live";
+
+export interface FuturesStatus {
+  running: boolean;
+  mode: BybitMode;
+  emergencyStopped: boolean;
+  emergencyStoppedAt: string | null;
+  emergencyStoppedReason: string | null;
+  consecutiveLosses: number;
+  tradingHaltedUntil: string | null;
+  liveTradingAllowedByConfig: boolean;
+  testnetConfigured: boolean;
+  liveConfigured: boolean;
+  strategyEnabled: boolean;
+  updatedAt: string;
+}
+
+export interface FuturesWallet {
+  configured: boolean;
+  mode: BybitMode;
+  totalEquityUsd: number | null;
+  availableBalanceUsd: number | null;
+}
+
+export interface FuturesStrategyConfig {
+  enabled: boolean;
+  symbolUniverse: "auto" | "manual";
+  autoTopNByVolume: number;
+  manualSymbols: string[];
+  minCompletedCandles: number;
+  atrOverCloseMax: number;
+  stddev30Max: number;
+  latestRangeAtrMultMax: number;
+  min24hTurnoverUsd: number;
+  volumeSpikeMultiplier: number;
+  maxSpreadPct: number;
+  entryZoneUpperMult: number;
+  entryZoneLowerMult: number;
+  trendEmaPeriod: number;
+  stochRsiKMax: number;
+  stochRsiCrossoverBelow: number;
+  rsiMin: number;
+  rsiMax: number;
+  slAtrMultiplier: number;
+  maxStopLossDistancePct: number;
+  tp1Pct: number;
+  tp2Pct: number;
+  tp3AtrTrailMultiplier: number;
+  minRiskReward: number;
+  maxPendingSignals: number;
+  maxActiveTrades: number;
+  btcVolatilityShockCheckEnabled: boolean;
+  fearGreedRejectBelow: number;
+  fearGreedReduceSizeAbove: number;
+  fearGreedSizeReductionFactor: number;
+  btcStochRsiOverboughtReject: number;
+  btcOrderbookAskBidRatioMax: number;
+  btcRsiOverboughtMax: number;
+  fundingRateMinPct: number;
+  fundingRateMaxPct: number;
+  openInterestVs100dAvgMaxPct: number;
+  entryPriceMaxDriftPct: number;
+  signalExpiryMinutes: number;
+  riskPerTradePct: number;
+  leverage: number;
+  maxLeverage: number;
+  tp1ClosePct: number;
+  tp2ClosePct: number;
+  moveSlToBreakevenAtTp1: boolean;
+  trailingAtrMultiplier: number;
+  stopAfterConsecutiveLosses: number;
+  dailyMaxLossPct: number;
+}
+
+export interface FuturesTakeProfit {
+  label: "tp1" | "tp2" | "tp3";
+  price: number;
+  closePct: number;
+}
+
+export interface FuturesSignal {
+  id: string;
+  symbol: string;
+  side: "long" | "short";
+  status: "pending" | "active" | "filled" | "cancelled" | "expired";
+  entryPrice: string;
+  stopLoss: string;
+  takeProfits: FuturesTakeProfit[];
+  score: string;
+  stage1: Record<string, unknown>;
+  stage2: Record<string, unknown>;
+  cancelledReason: string | null;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FuturesPosition {
+  id: string;
+  signalId: string | null;
+  symbol: string;
+  side: "long" | "short";
+  mode: BybitMode;
+  status: "open" | "closed";
+  leverage: number;
+  entryPrice: string;
+  qty: string;
+  remainingQty: string;
+  notionalUsd: string;
+  marginUsd: string;
+  stopLoss: string;
+  takeProfits: FuturesTakeProfit[];
+  takeProfitsFilled: string[];
+  breakevenMoved: boolean;
+  trailingActive: boolean;
+  trailingStopPrice: string | null;
+  bybitOrderId: string | null;
+  realizedPnlUsd: string;
+  closeReason: string | null;
+  openedAt: string;
+  closedAt: string | null;
+}
+
+export interface FuturesTrade {
+  id: string;
+  position_id: string | null;
+  symbol: string;
+  side: "open_long" | "open_short" | "close_long" | "close_short";
+  mode: BybitMode;
+  qty: string;
+  price_usd: string;
+  notional_usd: string;
+  fee_usd: string;
+  bybit_order_id: string | null;
+  status: "simulated" | "submitted" | "confirmed" | "failed";
+  failure_reason: string | null;
+  created_at: string;
+}
 
 export type ProviderId = "dexscreener" | "solanaRpc" | "jupiter" | "helius";
 
