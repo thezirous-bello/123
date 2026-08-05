@@ -216,7 +216,12 @@ export function SpotPanel() {
       >
         {!showConfig ? (
           <p className="font-mono text-xs text-white/50">
-            {config.symbolUniverse === "auto" ? `Auto-scanning top ${config.autoTopNByVolume} symbols by 24h volume` : `${config.manualSymbols.length} manual symbol(s)`} · risk{" "}
+            {config.symbolUniverse === "all"
+              ? "Scanning all Bybit symbols above the liquidity floor"
+              : config.symbolUniverse === "auto"
+                ? `Auto-scanning top ${config.autoTopNByVolume} symbols by 24h volume`
+                : `${config.manualSymbols.length} manual symbol(s)`}{" "}
+            · risk{" "}
             {config.riskPerTradePct}%/trade · max {config.maxActiveTrades} active, {config.maxPendingSignals} pending · daily loss
             limit {config.dailyMaxLossPct}% · halt after {config.stopAfterConsecutiveLosses} losses
           </p>
@@ -369,9 +374,10 @@ function ConfigEditor({ config, busy, onSave }: { config: SpotStrategyConfig; bu
         <div className="flex items-center gap-3">
           <select
             value={draft.symbolUniverse}
-            onChange={(e) => setDraft({ ...draft, symbolUniverse: e.target.value as "auto" | "manual" })}
+            onChange={(e) => setDraft({ ...draft, symbolUniverse: e.target.value as "auto" | "all" | "manual" })}
             className="rounded-md border border-white/15 bg-black/30 px-2 py-1 text-sm"
           >
+            <option value="all">All (every Bybit symbol above the liquidity floor)</option>
             <option value="auto">Auto (top N by 24h volume)</option>
             <option value="manual">Manual list</option>
           </select>

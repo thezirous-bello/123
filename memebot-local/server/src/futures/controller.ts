@@ -41,6 +41,7 @@ const SCAN_CONCURRENCY = 5;
 let tickHandle: NodeJS.Timeout | null = null;
 let tickInFlight = false;
 let lastScanAtMs = 0;
+let scanInFlight = false;
 
 async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
@@ -118,10 +119,23 @@ async function tick(mode: BybitMode) {
 
   if (isFuturesEmergencyStopped()) return;
 
+  // The scan is deliberately NOT awaited here: with symbolUniverse="all" it
+  // can take well over a minute (every Bybit symbol above the liquidity
+  // floor), and awaiting it would delay this function's return — which
+  // delays scheduleNextTick — which delays the NEXT position-management
+  // pass. Open leveraged positions need their stop-loss/take-profit
+  // checked every ~20s regardless of how long a scan is taking, so the scan
+  // runs in the background instead, guarded by scanInFlight so two scans
+  // can never overlap.
   const now = Date.now();
-  if (now - lastScanAtMs >= SIGNAL_SCAN_INTERVAL_MS) {
+  if (!scanInFlight && now - lastScanAtMs >= SIGNAL_SCAN_INTERVAL_MS) {
     lastScanAtMs = now;
-    await runSignalScan(mode);
+    scanInFlight = true;
+    runSignalScan(mode)
+      .catch((err) => recordLog("error", "futures_signal_evaluation", `Signal scan failed: ${(err as Error).message}`))
+      .finally(() => {
+        scanInFlight = false;
+      });
   }
 }
 
@@ -129,11 +143,13 @@ async function resolveSymbolUniverse(mode: BybitMode): Promise<string[]> {
   const config = getFuturesStrategyConfig();
   if (config.symbolUniverse === "manual") return config.manualSymbols;
   const tickers = await getAllTickers(mode, CATEGORY);
-  return tickers
-    .filter((t) => t.turnover24h >= config.min24hTurnoverUsd)
-    .sort((a, b) => b.turnover24h - a.turnover24h)
-    .slice(0, config.autoTopNByVolume)
-    .map((t) => t.symbol);
+  const eligible = tickers.filter((t) => t.turnover24h >= config.min24hTurnoverUsd).sort((a, b) => b.turnover24h - a.turnover24h);
+  // "all" scans every symbol above the liquidity floor (still excludes
+  // literally dead/zero-volume pairs, since those can never produce a real
+  // signal) — "auto" keeps the old top-N-by-volume cap for anyone who wants
+  // a smaller, faster-cycling universe instead.
+  const symbols = config.symbolUniverse === "all" ? eligible : eligible.slice(0, config.autoTopNByVolume);
+  return symbols.map((t) => t.symbol);
 }
 
 async function runSignalScan(mode: BybitMode) {
@@ -166,6 +182,15 @@ async function runSignalScan(mode: BybitMode) {
     return;
   }
   recordLog("info", "futures_signal_evaluation", `Stage 1 winner: ${best.side.toUpperCase()} ${best.symbol} (score ${best.score.toFixed(1)}, ${best.confidence} confidence)`, { candidate: best });
+
+  // The scan runs detached from the tick loop (see tick()'s comment) and a
+  // full "all symbols" pass can take over a minute — re-check that the bot
+  // is still meant to be trading before acting on what it found, in case
+  // Stop/Emergency Stop was clicked mid-scan.
+  if (!getFuturesBotState().running || isFuturesEmergencyStopped()) {
+    recordLog("debug", "futures_signal_evaluation", "Bot stopped mid-scan — discarding this scan's result.");
+    return;
+  }
 
   const stage2 = await validateSignalStage2(best, config, mode, {
     pendingSignalsCount: countPendingSignals(),

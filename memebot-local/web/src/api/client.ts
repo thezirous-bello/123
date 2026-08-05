@@ -340,7 +340,7 @@ export interface SpotWallet {
 
 export interface SpotStrategyConfig {
   enabled: boolean;
-  symbolUniverse: "auto" | "manual";
+  symbolUniverse: "auto" | "all" | "manual";
   autoTopNByVolume: number;
   manualSymbols: string[];
   minCompletedCandles: number;
@@ -466,7 +466,7 @@ export interface FuturesWallet {
 
 export interface FuturesStrategyConfig {
   enabled: boolean;
-  symbolUniverse: "auto" | "manual";
+  symbolUniverse: "auto" | "all" | "manual";
   autoTopNByVolume: number;
   manualSymbols: string[];
   minCompletedCandles: number;

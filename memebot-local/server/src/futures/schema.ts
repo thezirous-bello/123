@@ -16,8 +16,8 @@ export const FuturesStrategyConfigObjectSchema = z
     enabled: z.boolean().default(false),
 
     // Symbol universe
-    symbolUniverse: z.enum(["auto", "manual"]).default("auto"),
-    autoTopNByVolume: z.number().int().gt(0).max(100).default(30),
+    symbolUniverse: z.enum(["auto", "all", "manual"]).default("all"),
+    autoTopNByVolume: z.number().int().gt(0).max(1000).default(30),
     manualSymbols: z.array(z.string()).default([]),
 
     // Stage 1 — shared skip conditions
