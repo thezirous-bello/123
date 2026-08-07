@@ -17,7 +17,7 @@ describe("FuturesStrategyConfigSchema", () => {
     expect(config.dailyMaxLossPct).toBe(8);
     expect(config.fearGreedLongThreshold).toBe(60);
     expect(config.fearGreedShortThreshold).toBe(40);
-    expect(config.minDailyMovePct).toBe(8);
+    expect(config.minDailyMovePct).toBe(2);
     expect(config.stochRsiCrossoverLookback).toBe(3);
   });
 

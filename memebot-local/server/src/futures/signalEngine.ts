@@ -216,6 +216,10 @@ function buildTradeSetup(side: SignalSide, ind: SymbolIndicators, config: Future
 }
 
 function scoreCandidate(params: {
+  pulledBack: boolean;
+  freshCrossover: boolean;
+  volumeSpike: boolean;
+  risingRsi: boolean;
   volumeRatio: number;
   atrOverClose: number;
   atrOverCloseMax: number;
@@ -225,47 +229,61 @@ function scoreCandidate(params: {
   riskReward: number;
   minRiskReward: number;
 }): number {
-  // Weighted toward volume/movement/breakout structure, matching the
-  // spec's own emphasis on volatile movers and "prioritize breakout and
-  // breakdown setups over ranging markets."
-  const volumeScore = Math.min(2, params.volumeRatio) * 20;
-  const movementScore = Math.min(1, Math.abs(params.price24hMovePct) / 15) * 20; // 15% is the top of the spec's preferred daily-move range
-  const breakoutScore = params.breakoutConfirmed ? 20 : 0;
-  const stochScore = Math.min(1, params.stochSpread / 20) * 10;
+  // Only rsiBand + stochRsi-direction + valid SL/RR are hard gates (see
+  // evaluateLongSetup/evaluateShortSetup) — everything below is a "nice to
+  // have" that used to be a hard gate too. Rewarding it in score instead
+  // still favors the cleanest setups (higher confidence -> more leverage/
+  // size) without blocking every setup that doesn't hit all of them at once.
+  const pulledBackScore = params.pulledBack ? 15 : 0;
+  const crossoverScore = params.freshCrossover ? 15 : 0;
+  const volumeSpikeScore = params.volumeSpike ? 10 : 0;
+  const risingRsiScore = params.risingRsi ? 5 : 0;
+  const volumeScore = Math.min(2, params.volumeRatio) * 7.5;
+  const movementScore = Math.min(1, Math.abs(params.price24hMovePct) / 15) * 10; // 15% is the top of the spec's preferred daily-move range
+  const breakoutScore = params.breakoutConfirmed ? 10 : 0;
+  const stochScore = Math.min(1, params.stochSpread / 20) * 5;
   const rrScore = Math.min(2, params.riskReward / params.minRiskReward) * 10;
-  const volatilityScore = Math.min(1, params.atrOverClose / params.atrOverCloseMax) * 10;
-  return volumeScore + movementScore + breakoutScore + stochScore + rrScore + volatilityScore;
+  const volatilityScore = Math.min(1, params.atrOverClose / params.atrOverCloseMax) * 5;
+  return (
+    pulledBackScore + crossoverScore + volumeSpikeScore + risingRsiScore + volumeScore + movementScore + breakoutScore + stochScore + rrScore + volatilityScore
+  );
 }
 
 function evaluateLongSetup(ind: SymbolIndicators, config: FuturesStrategyConfig, symbol: string): Stage1Candidate | Stage1Rejection {
   const { current, currentVwap, currentEma20, supportLevel, k, d, currentRsi, prevRsi, stoch, volumeRatio, ticker } = ind;
 
-  const pulledBack =
-    nearLevel(current.close, currentVwap, config.pullbackMaxDistancePct) ||
-    nearLevel(current.close, currentEma20, config.pullbackMaxDistancePct) ||
-    nearLevel(current.close, supportLevel, config.pullbackMaxDistancePct);
-  if (!pulledBack) {
-    return { symbol, reason: `LONG: price ${current.close} is not within ${config.pullbackMaxDistancePct}% of VWAP (${currentVwap.toFixed(6)}), EMA20 (${currentEma20.toFixed(6)}), or support (${supportLevel.toFixed(6)}).` };
-  }
+  // Only two hard gates: RSI in a (wide, permissive) band, and StochRSI
+  // pointing the right way without already being maxed out. Everything
+  // else — pullback proximity, a fresh crossover, a volume spike, RSI
+  // actively turning up — is rewarded in score below instead of required,
+  // so a real setup doesn't get thrown out for missing one nice-to-have.
   if (currentRsi < config.rsiLongMin || currentRsi > config.rsiLongMax) {
     return { symbol, reason: `LONG: RSI ${currentRsi.toFixed(1)} outside [${config.rsiLongMin}, ${config.rsiLongMax}].` };
   }
-  if (!(currentRsi > prevRsi)) {
-    return { symbol, reason: `LONG: RSI ${currentRsi.toFixed(1)} is not turning up (was ${prevRsi.toFixed(1)}).` };
+  if (!(k >= d)) {
+    return { symbol, reason: `LONG: StochRSI K (${k.toFixed(1)}) below D (${d.toFixed(1)}).` };
   }
-  if (!stochRsiCrossedUpWithin(stoch, config.stochRsiCrossoverLookback)) {
-    return { symbol, reason: `LONG: no bullish StochRSI crossover within the last ${config.stochRsiCrossoverLookback} candles (K=${k.toFixed(1)}, D=${d.toFixed(1)}).` };
-  }
-  if (!(volumeRatio >= config.volumeSpikeMultiplier)) {
-    return { symbol, reason: `LONG: volume ${volumeRatio.toFixed(2)}x average, needs >= ${config.volumeSpikeMultiplier}x spike.` };
+  if (k > config.stochRsiLongMaxK) {
+    return { symbol, reason: `LONG: StochRSI K (${k.toFixed(1)}) exceeds max ${config.stochRsiLongMaxK} (already overbought).` };
   }
 
   const setup = buildTradeSetup("long", ind, config);
   if (!setup) return { symbol, reason: "LONG: stop-loss distance or risk:reward failed trade-setup rules." };
 
+  const pulledBack =
+    nearLevel(current.close, currentVwap, config.pullbackMaxDistancePct) ||
+    nearLevel(current.close, currentEma20, config.pullbackMaxDistancePct) ||
+    nearLevel(current.close, supportLevel, config.pullbackMaxDistancePct);
+  const freshCrossover = stochRsiCrossedUpWithin(stoch, config.stochRsiCrossoverLookback);
+  const volumeSpike = volumeRatio >= config.volumeSpikeMultiplier;
+  const risingRsi = currentRsi > prevRsi;
   const breakoutConfirmed = config.breakoutPreferenceEnabled && isMakingHigherHighsHigherLows(ind.entryCandles, 30);
   const atrOverClose = ind.currentAtr / current.close;
   const score = scoreCandidate({
+    pulledBack,
+    freshCrossover,
+    volumeSpike,
+    risingRsi,
     volumeRatio,
     atrOverClose,
     atrOverCloseMax: config.atrOverCloseMax,
@@ -300,7 +318,17 @@ function evaluateLongSetup(ind: SymbolIndicators, config: FuturesStrategyConfig,
       spreadPct: ind.spreadPct,
       turnover24h: ticker!.turnover24h,
       price24hPct: ticker!.price24hPct,
-      pullbackReference: nearLevel(current.close, currentVwap, config.pullbackMaxDistancePct) ? "vwap" : nearLevel(current.close, currentEma20, config.pullbackMaxDistancePct) ? "ema20" : "support",
+      pulledBack,
+      freshCrossover,
+      volumeSpike,
+      risingRsi,
+      pullbackReference: pulledBack
+        ? nearLevel(current.close, currentVwap, config.pullbackMaxDistancePct)
+          ? "vwap"
+          : nearLevel(current.close, currentEma20, config.pullbackMaxDistancePct)
+            ? "ema20"
+            : "support"
+        : "none",
     },
   };
 }
@@ -308,32 +336,35 @@ function evaluateLongSetup(ind: SymbolIndicators, config: FuturesStrategyConfig,
 function evaluateShortSetup(ind: SymbolIndicators, config: FuturesStrategyConfig, symbol: string): Stage1Candidate | Stage1Rejection {
   const { current, currentVwap, currentEma20, resistanceLevel, k, d, currentRsi, prevRsi, stoch, volumeRatio, ticker } = ind;
 
-  const rejected =
-    nearLevel(current.close, currentVwap, config.pullbackMaxDistancePct) ||
-    nearLevel(current.close, currentEma20, config.pullbackMaxDistancePct) ||
-    nearLevel(current.close, resistanceLevel, config.pullbackMaxDistancePct);
-  if (!rejected) {
-    return { symbol, reason: `SHORT: price ${current.close} is not within ${config.pullbackMaxDistancePct}% of VWAP (${currentVwap.toFixed(6)}), EMA20 (${currentEma20.toFixed(6)}), or resistance (${resistanceLevel.toFixed(6)}).` };
-  }
+  // Same two hard gates as evaluateLongSetup, mirrored: RSI in band, and
+  // StochRSI pointing down without already being maxed out oversold.
   if (currentRsi < config.rsiShortMin || currentRsi > config.rsiShortMax) {
     return { symbol, reason: `SHORT: RSI ${currentRsi.toFixed(1)} outside [${config.rsiShortMin}, ${config.rsiShortMax}].` };
   }
-  if (!(currentRsi < prevRsi)) {
-    return { symbol, reason: `SHORT: RSI ${currentRsi.toFixed(1)} is not turning down (was ${prevRsi.toFixed(1)}).` };
+  if (!(k <= d)) {
+    return { symbol, reason: `SHORT: StochRSI K (${k.toFixed(1)}) above D (${d.toFixed(1)}).` };
   }
-  if (!stochRsiCrossedDownWithin(stoch, config.stochRsiCrossoverLookback)) {
-    return { symbol, reason: `SHORT: no bearish StochRSI crossover within the last ${config.stochRsiCrossoverLookback} candles (K=${k.toFixed(1)}, D=${d.toFixed(1)}).` };
-  }
-  if (!(volumeRatio >= config.volumeSpikeMultiplier)) {
-    return { symbol, reason: `SHORT: volume ${volumeRatio.toFixed(2)}x average, needs >= ${config.volumeSpikeMultiplier}x spike.` };
+  if (k < config.stochRsiShortMinK) {
+    return { symbol, reason: `SHORT: StochRSI K (${k.toFixed(1)}) below min ${config.stochRsiShortMinK} (already oversold).` };
   }
 
   const setup = buildTradeSetup("short", ind, config);
   if (!setup) return { symbol, reason: "SHORT: stop-loss distance or risk:reward failed trade-setup rules." };
 
+  const pulledBack =
+    nearLevel(current.close, currentVwap, config.pullbackMaxDistancePct) ||
+    nearLevel(current.close, currentEma20, config.pullbackMaxDistancePct) ||
+    nearLevel(current.close, resistanceLevel, config.pullbackMaxDistancePct);
+  const freshCrossover = stochRsiCrossedDownWithin(stoch, config.stochRsiCrossoverLookback);
+  const volumeSpike = volumeRatio >= config.volumeSpikeMultiplier;
+  const risingRsi = currentRsi < prevRsi; // "falling" for short, reuses the same score field
   const breakoutConfirmed = config.breakoutPreferenceEnabled && isMakingLowerHighsLowerLows(ind.entryCandles, 30);
   const atrOverClose = ind.currentAtr / current.close;
   const score = scoreCandidate({
+    pulledBack,
+    freshCrossover,
+    volumeSpike,
+    risingRsi,
     volumeRatio,
     atrOverClose,
     atrOverCloseMax: config.atrOverCloseMax,
@@ -368,7 +399,17 @@ function evaluateShortSetup(ind: SymbolIndicators, config: FuturesStrategyConfig
       spreadPct: ind.spreadPct,
       turnover24h: ticker!.turnover24h,
       price24hPct: ticker!.price24hPct,
-      pullbackReference: nearLevel(current.close, currentVwap, config.pullbackMaxDistancePct) ? "vwap" : nearLevel(current.close, currentEma20, config.pullbackMaxDistancePct) ? "ema20" : "resistance",
+      pulledBack,
+      freshCrossover,
+      volumeSpike,
+      fallingRsi: risingRsi,
+      pullbackReference: pulledBack
+        ? nearLevel(current.close, currentVwap, config.pullbackMaxDistancePct)
+          ? "vwap"
+          : nearLevel(current.close, currentEma20, config.pullbackMaxDistancePct)
+            ? "ema20"
+            : "resistance"
+        : "none",
     },
   };
 }

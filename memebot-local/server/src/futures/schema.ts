@@ -24,7 +24,7 @@ export const FuturesStrategyConfigObjectSchema = z
     // Turnover floor is deliberately lower than a blue-chip strategy's would
     // be, since this spec explicitly wants meme coins / newly listed coins.
     min24hTurnoverUsd: z.number().gte(0).default(1_000_000),
-    minDailyMovePct: z.number().gte(0).default(8),
+    minDailyMovePct: z.number().gte(0).default(2),
     maxSpreadPct: z.number().gt(0).default(0.5),
     atrOverCloseMax: z.number().gt(0).default(0.15),
 
@@ -34,15 +34,23 @@ export const FuturesStrategyConfigObjectSchema = z
     entryEmaPeriod: z.number().int().gt(0).default(20),
     supportResistanceLookback: z.number().int().gt(0).default(20),
 
-    // LONG/SHORT entry — shared shape, mirrored either side of price
-    pullbackMaxDistancePct: z.number().gt(0).default(1.5), // max distance from VWAP/EMA20/support-resistance to count as "pulled back to" it
-    rsiLongMin: z.number().gte(0).lte(100).default(35),
-    rsiLongMax: z.number().gte(0).lte(100).default(50),
-    rsiShortMin: z.number().gte(0).lte(100).default(50),
-    rsiShortMax: z.number().gte(0).lte(100).default(65),
-    volumeSpikeMultiplier: z.number().gt(0).default(1.5),
-    stochRsiCrossoverLookback: z.number().int().gt(0).default(3), // crossover must have happened within this many candles, not necessarily the very last one
-    breakoutPreferenceEnabled: z.boolean().default(true), // "Prioritize breakout and breakdown setups over ranging markets" — scoring bonus, not a hard filter
+    // LONG/SHORT entry — only two hard gates now: RSI band + StochRSI
+    // direction (K vs D, not overbought/oversold). Pullback-to-level, a
+    // fresh crossover, volume spike, and RSI-turning are all still
+    // computed and rewarded in scoring (see scoreCandidate in
+    // signalEngine.ts) but no longer required to all land on the same
+    // candle — that conjunction was making a qualifying setup on either
+    // side close to impossible.
+    rsiLongMin: z.number().gte(0).lte(100).default(20),
+    rsiLongMax: z.number().gte(0).lte(100).default(65),
+    rsiShortMin: z.number().gte(0).lte(100).default(35),
+    rsiShortMax: z.number().gte(0).lte(100).default(80),
+    stochRsiLongMaxK: z.number().gte(0).lte(100).default(80), // long: K must be <= this (not already overbought)
+    stochRsiShortMinK: z.number().gte(0).lte(100).default(20), // short: K must be >= this (not already oversold)
+    pullbackMaxDistancePct: z.number().gt(0).default(1.5), // scoring bonus: within this % of VWAP/EMA20/support-resistance
+    volumeSpikeMultiplier: z.number().gt(0).default(1.5), // scoring bonus threshold
+    stochRsiCrossoverLookback: z.number().int().gt(0).default(3), // scoring bonus: crossover within this many candles
+    breakoutPreferenceEnabled: z.boolean().default(true), // "Prioritize breakout and breakdown setups over ranging markets" — scoring bonus
 
     // Trade setup — fixed percentages per the spec, not ATR-derived
     slMinPct: z.number().gt(0).default(3),
@@ -59,8 +67,8 @@ export const FuturesStrategyConfigObjectSchema = z
     btcSuddenMoveMaxPct: z.number().gt(0).default(3), // "Avoid Trading: Sudden BTC moves larger than 3%"
     fundingLongMaxPct: z.number().default(0.05),
     fundingShortMinPct: z.number().default(-0.05),
-    oiIncreasingRequired: z.boolean().default(true), // "Open Interest increasing" (entry) + "Prefer increasing Open Interest" (extra filter)
-    volumeIncreasingRequired: z.boolean().default(true), // "Prefer... increasing Volume" (extra filter)
+    oiIncreasingRequired: z.boolean().default(false), // "Open Interest increasing" (entry) + "Prefer increasing Open Interest" (extra filter) — off by default, opt back in once trades are flowing
+    volumeIncreasingRequired: z.boolean().default(false), // "Prefer... increasing Volume" (extra filter) — off by default, same reason
     entryPriceMaxDriftPct: z.number().gt(0).default(0.4),
     signalExpiryMinutes: z.number().gt(0).default(15),
 
