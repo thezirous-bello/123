@@ -16,7 +16,9 @@ import {
   stddevOfReturns,
   stochRsi,
   stochRsiCrossedDown,
+  stochRsiCrossedDownWithin,
   stochRsiCrossedUp,
+  stochRsiCrossedUpWithin,
   vwap,
 } from "../src/ta/indicators.js";
 import type { Candle } from "../src/bybit/marketData.js";
@@ -240,5 +242,29 @@ describe("stochRsiCrossedUp / stochRsiCrossedDown", () => {
     const stoch = { k: [40, 45, 50], d: [20, 25, 30] };
     expect(stochRsiCrossedUp(stoch)).toBe(false);
     expect(stochRsiCrossedDown(stoch)).toBe(false);
+  });
+});
+
+describe("stochRsiCrossedUpWithin / stochRsiCrossedDownWithin", () => {
+  it("finds a bullish crossover that happened a few candles ago, not just on the last one", () => {
+    // Cross happens between index 1 and 2 (K: 20<=25 -> 35>25); the last
+    // two points (index 3->4) show no crossover at all.
+    const stoch = { k: [10, 20, 35, 34, 33], d: [30, 25, 25, 26, 27] };
+    expect(stochRsiCrossedUp(stoch)).toBe(false); // strict last-candle check misses it
+    expect(stochRsiCrossedUpWithin(stoch, 3)).toBe(true); // lookback check finds it
+    expect(stochRsiCrossedUpWithin(stoch, 1)).toBe(false); // too short a window still misses it
+  });
+
+  it("finds a bearish crossover within the lookback window", () => {
+    const stoch = { k: [40, 30, 10, 11, 12], d: [20, 25, 25, 24, 23] };
+    expect(stochRsiCrossedDown(stoch)).toBe(false);
+    expect(stochRsiCrossedDownWithin(stoch, 3)).toBe(true);
+    expect(stochRsiCrossedDownWithin(stoch, 1)).toBe(false);
+  });
+
+  it("is false when no crossover occurred anywhere in the window", () => {
+    const stoch = { k: [40, 45, 50, 55, 60], d: [20, 25, 30, 35, 40] };
+    expect(stochRsiCrossedUpWithin(stoch, 4)).toBe(false);
+    expect(stochRsiCrossedDownWithin(stoch, 4)).toBe(false);
   });
 });

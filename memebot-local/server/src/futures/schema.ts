@@ -41,6 +41,7 @@ export const FuturesStrategyConfigObjectSchema = z
     rsiShortMin: z.number().gte(0).lte(100).default(50),
     rsiShortMax: z.number().gte(0).lte(100).default(65),
     volumeSpikeMultiplier: z.number().gt(0).default(1.5),
+    stochRsiCrossoverLookback: z.number().int().gt(0).default(3), // crossover must have happened within this many candles, not necessarily the very last one
     breakoutPreferenceEnabled: z.boolean().default(true), // "Prioritize breakout and breakdown setups over ranging markets" — scoring bonus, not a hard filter
 
     // Trade setup — fixed percentages per the spec, not ATR-derived

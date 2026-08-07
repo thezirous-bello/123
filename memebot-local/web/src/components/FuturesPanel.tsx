@@ -439,6 +439,7 @@ function ConfigEditor({ config, busy, onSave }: { config: FuturesStrategyConfig;
           {field("rsiLongMin", "Min RSI", 1)}
           {field("rsiLongMax", "Max RSI", 1)}
           {field("volumeSpikeMultiplier", "Volume spike x")}
+          {field("stochRsiCrossoverLookback", "StochRSI crossover lookback", 1)}
           {field("fundingLongMaxPct", "Max funding rate %")}
         </div>
       </div>

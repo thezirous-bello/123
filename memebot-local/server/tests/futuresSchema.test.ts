@@ -18,6 +18,7 @@ describe("FuturesStrategyConfigSchema", () => {
     expect(config.fearGreedLongThreshold).toBe(60);
     expect(config.fearGreedShortThreshold).toBe(40);
     expect(config.minDailyMovePct).toBe(8);
+    expect(config.stochRsiCrossoverLookback).toBe(3);
   });
 
   it("rejects a confidence-tier leverage value outside [minLeverage, maxLeverage]", () => {

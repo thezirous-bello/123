@@ -349,3 +349,37 @@ export function stochRsiCrossedDown(stoch: StochRsiResult): boolean {
   if ([k0, d0, k1, d1].some((v) => v === undefined || Number.isNaN(v))) return false;
   return k0! >= d0! && k1! < d1!;
 }
+
+/** True if a bullish StochRSI crossover happened on ANY of the last
+ * `lookback` candles, not just the very last one. A fresh cross is a
+ * single-candle event — requiring it to land on the exact candle a symbol
+ * is also being evaluated on (in addition to every other entry condition)
+ * makes the whole setup near-impossible to trigger. This is the standard
+ * "wait for confirmation while still in the zone" pattern: the crossover
+ * just has to have happened recently, not at this exact instant. */
+export function stochRsiCrossedUpWithin(stoch: StochRsiResult, lookback: number): boolean {
+  const n = stoch.k.length;
+  for (let i = Math.max(1, n - lookback); i < n; i++) {
+    const k0 = stoch.k[i - 1];
+    const d0 = stoch.d[i - 1];
+    const k1 = stoch.k[i];
+    const d1 = stoch.d[i];
+    if ([k0, d0, k1, d1].some((v) => v === undefined || Number.isNaN(v))) continue;
+    if (k0! <= d0! && k1! > d1!) return true;
+  }
+  return false;
+}
+
+/** Mirror of stochRsiCrossedUpWithin for bearish crossovers. */
+export function stochRsiCrossedDownWithin(stoch: StochRsiResult, lookback: number): boolean {
+  const n = stoch.k.length;
+  for (let i = Math.max(1, n - lookback); i < n; i++) {
+    const k0 = stoch.k[i - 1];
+    const d0 = stoch.d[i - 1];
+    const k1 = stoch.k[i];
+    const d1 = stoch.d[i];
+    if ([k0, d0, k1, d1].some((v) => v === undefined || Number.isNaN(v))) continue;
+    if (k0! >= d0! && k1! < d1!) return true;
+  }
+  return false;
+}

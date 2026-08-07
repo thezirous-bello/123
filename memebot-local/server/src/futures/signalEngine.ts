@@ -12,7 +12,9 @@ import {
   secondLast,
   stochRsi,
   stochRsiCrossedDown,
+  stochRsiCrossedDownWithin,
   stochRsiCrossedUp,
+  stochRsiCrossedUpWithin,
   vwap,
   type StochRsiResult,
 } from "../ta/indicators.js";
@@ -251,8 +253,8 @@ function evaluateLongSetup(ind: SymbolIndicators, config: FuturesStrategyConfig,
   if (!(currentRsi > prevRsi)) {
     return { symbol, reason: `LONG: RSI ${currentRsi.toFixed(1)} is not turning up (was ${prevRsi.toFixed(1)}).` };
   }
-  if (!stochRsiCrossedUp(stoch)) {
-    return { symbol, reason: `LONG: no bullish StochRSI crossover (K=${k.toFixed(1)}, D=${d.toFixed(1)}).` };
+  if (!stochRsiCrossedUpWithin(stoch, config.stochRsiCrossoverLookback)) {
+    return { symbol, reason: `LONG: no bullish StochRSI crossover within the last ${config.stochRsiCrossoverLookback} candles (K=${k.toFixed(1)}, D=${d.toFixed(1)}).` };
   }
   if (!(volumeRatio >= config.volumeSpikeMultiplier)) {
     return { symbol, reason: `LONG: volume ${volumeRatio.toFixed(2)}x average, needs >= ${config.volumeSpikeMultiplier}x spike.` };
@@ -319,8 +321,8 @@ function evaluateShortSetup(ind: SymbolIndicators, config: FuturesStrategyConfig
   if (!(currentRsi < prevRsi)) {
     return { symbol, reason: `SHORT: RSI ${currentRsi.toFixed(1)} is not turning down (was ${prevRsi.toFixed(1)}).` };
   }
-  if (!stochRsiCrossedDown(stoch)) {
-    return { symbol, reason: `SHORT: no bearish StochRSI crossover (K=${k.toFixed(1)}, D=${d.toFixed(1)}).` };
+  if (!stochRsiCrossedDownWithin(stoch, config.stochRsiCrossoverLookback)) {
+    return { symbol, reason: `SHORT: no bearish StochRSI crossover within the last ${config.stochRsiCrossoverLookback} candles (K=${k.toFixed(1)}, D=${d.toFixed(1)}).` };
   }
   if (!(volumeRatio >= config.volumeSpikeMultiplier)) {
     return { symbol, reason: `SHORT: volume ${volumeRatio.toFixed(2)}x average, needs >= ${config.volumeSpikeMultiplier}x spike.` };
