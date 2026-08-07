@@ -201,7 +201,11 @@ interface InstrumentInfoRow {
   status: string;
   // Linear: qtyStep. Spot: basePrecision instead (no qtyStep field at all) —
   // verified against Bybit's own SDK type defs, these genuinely differ.
-  lotSizeFilter: { qtyStep?: string; basePrecision?: string; minOrderQty: string; maxOrderQty?: string };
+  // maxOrderQty is the cap for LIMIT orders; linear/inverse contracts carry
+  // a separate, usually much smaller maxMktOrderQty specifically for MARKET
+  // orders (slippage protection) — this app only ever submits Market
+  // orders, so that's the one that actually governs what we can send.
+  lotSizeFilter: { qtyStep?: string; basePrecision?: string; minOrderQty: string; maxOrderQty?: string; maxMktOrderQty?: string };
   priceFilter: { tickSize: string };
   // Spot instruments have no leverageFilter at all (spot has no leverage).
   leverageFilter?: { minLeverage: string; maxLeverage: string };
@@ -225,10 +229,15 @@ export interface InstrumentInfo {
 /** Every symbol's quantity/price rounding rules (and max leverage, for
  * linear only — spot instruments report maxLeverage as 1) — required before
  * placing any order so qty/price aren't rejected for wrong precision.
- * maxOrderQty in particular matters a lot for low-priced/high-supply coins:
- * a leveraged position sized purely from equity/leverage/price can demand
- * far more raw contracts than Bybit allows in a single order, well before
- * any USD notional limit is even relevant. */
+ * maxOrderQty here is already the effective MARKET-order cap (the smaller
+ * of lotSizeFilter's maxOrderQty and maxMktOrderQty, when both are
+ * present) — using the plain maxOrderQty alone still let market orders on
+ * some symbols sail past Bybit's real, tighter market-order limit and get
+ * rejected even after clamping against it. This matters a lot for
+ * low-priced/high-supply coins: a leveraged position sized purely from
+ * equity/leverage/price can demand far more raw contracts than a single
+ * market order is allowed to hold, well before any USD notional limit is
+ * even relevant. */
 export async function getInstrumentInfo(
   symbol: string,
   mode: BybitMode = "testnet",
@@ -237,12 +246,16 @@ export async function getInstrumentInfo(
   const result = await bybitGetPublic<InstrumentsInfoResult>("/v5/market/instruments-info", { category, symbol }, mode);
   const row = result.list[0];
   if (!row) return null;
+  const candidateCaps = [row.lotSizeFilter.maxOrderQty, row.lotSizeFilter.maxMktOrderQty]
+    .filter((v): v is string => v !== undefined && v !== "")
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0);
   return {
     symbol: row.symbol,
     tradingActive: row.status === "Trading",
     qtyStep: Number(row.lotSizeFilter.qtyStep ?? row.lotSizeFilter.basePrecision ?? 0.001),
     minOrderQty: Number(row.lotSizeFilter.minOrderQty),
-    maxOrderQty: row.lotSizeFilter.maxOrderQty ? Number(row.lotSizeFilter.maxOrderQty) : Infinity,
+    maxOrderQty: candidateCaps.length > 0 ? Math.min(...candidateCaps) : Infinity,
     tickSize: Number(row.priceFilter.tickSize),
     maxLeverage: row.leverageFilter ? Number(row.leverageFilter.maxLeverage) : 1,
   };

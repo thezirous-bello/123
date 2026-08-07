@@ -1,5 +1,13 @@
-import { bybitGetPrivate, bybitPostPrivate, type BybitMode } from "./client.js";
+import { BybitApiError, bybitGetPrivate, bybitPostPrivate, type BybitMode } from "./client.js";
 import type { BybitCategory } from "./marketData.js";
+
+// "Leverage not modified" — Bybit rejects set-leverage as an error when the
+// requested leverage already matches what's set, instead of treating it as
+// a harmless no-op. Without special-casing this, re-entering the same
+// symbol at the same confidence tier's leverage (very common — leverage is
+// a small, config-driven set of tiers, not something that varies per
+// signal) would cancel an otherwise-good trade for no real reason.
+const LEVERAGE_NOT_MODIFIED_RETCODE = 110043;
 
 export type OrderSide = "Buy" | "Sell";
 
@@ -90,12 +98,17 @@ export async function getOpenPositions(mode: BybitMode, symbol?: string): Promis
 }
 
 export async function setLeverage(mode: BybitMode, symbol: string, leverage: number): Promise<void> {
-  await bybitPostPrivate(mode, "/v5/position/set-leverage", {
-    category: "linear",
-    symbol,
-    buyLeverage: String(leverage),
-    sellLeverage: String(leverage),
-  });
+  try {
+    await bybitPostPrivate(mode, "/v5/position/set-leverage", {
+      category: "linear",
+      symbol,
+      buyLeverage: String(leverage),
+      sellLeverage: String(leverage),
+    });
+  } catch (err) {
+    if (err instanceof BybitApiError && err.retCode === LEVERAGE_NOT_MODIFIED_RETCODE) return;
+    throw err;
+  }
 }
 
 export interface SetTradingStopParams {

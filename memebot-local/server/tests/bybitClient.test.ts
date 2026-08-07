@@ -4,6 +4,7 @@ process.env.BYBIT_TESTNET_API_KEY = "test-key";
 process.env.BYBIT_TESTNET_API_SECRET = "test-secret";
 
 const { bybitGetPrivate, BybitApiError } = await import("../src/bybit/client.js");
+const { setLeverage } = await import("../src/bybit/trading.js");
 
 function envelope(retCode: number, retMsg: string, result: unknown, timeMs: number): Response {
   return new Response(JSON.stringify({ retCode, retMsg, result, time: timeMs }), { status: 200, headers: { "content-type": "application/json" } });
@@ -65,5 +66,23 @@ describe("bybit client — clock drift resilience", () => {
 
     await expect(bybitGetPrivate("testnet", "/v5/account/wallet-balance", { accountType: "UNIFIED" })).rejects.toThrow(BybitApiError);
     expect(callCount).toBe(1);
+  });
+});
+
+describe("setLeverage — 'leverage not modified' is not a real failure", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it("swallows retCode 110043 instead of throwing, since the leverage is already correct", async () => {
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(envelope(110043, "leverage not modified", null, Date.now()));
+    await expect(setLeverage("testnet", "COTIUSDT", 22)).resolves.toBeUndefined();
+  });
+
+  it("still throws on a genuine set-leverage failure", async () => {
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(envelope(10001, "params error", null, Date.now()));
+    await expect(setLeverage("testnet", "COTIUSDT", 22)).rejects.toThrow(BybitApiError);
   });
 });
