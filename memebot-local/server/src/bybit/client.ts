@@ -20,6 +20,23 @@ const BASE_URL: Record<BybitMode, string> = {
 
 const RECV_WINDOW = "5000";
 
+// Bybit's timestamp check is tighter than RECV_WINDOW alone suggests: a
+// request is only valid roughly within [server_time - recv_window,
+// server_time + 1000ms] — recv_window mostly covers a *slow* local clock,
+// not a fast one. A local clock just a few seconds ahead of Bybit's server
+// (common on VMs/containers without NTP sync) trips retCode 10002 even
+// though 5000ms of drift looks like it should be well within budget. Every
+// Bybit response — success or error — carries the server's own timestamp
+// in its envelope, so instead of trusting the local clock blindly, drift
+// against it is tracked and applied to every signed request's timestamp.
+let serverTimeOffsetMs = 0;
+
+function updateServerTimeOffset(envelopeTimeMs: number | undefined) {
+  if (typeof envelopeTimeMs === "number" && Number.isFinite(envelopeTimeMs)) {
+    serverTimeOffsetMs = envelopeTimeMs - Date.now();
+  }
+}
+
 export class BybitApiError extends Error {
   retCode: number;
   constructor(retCode: number, retMsg: string) {
@@ -55,12 +72,15 @@ function toQueryString(params: Record<string, unknown>): string {
   return entries.map(([k, v]) => `${k}=${String(v)}`).join("&");
 }
 
+const TIMESTAMP_ERROR_RETCODE = 10002;
+
 async function request<T>(
   mode: BybitMode,
   method: "GET" | "POST",
   path: string,
   params: Record<string, unknown> = {},
   requireAuth: boolean,
+  isRetryAfterTimestampError = false,
 ): Promise<T> {
   const base = BASE_URL[mode];
   const queryString = method === "GET" ? toQueryString(params) : "";
@@ -76,7 +96,7 @@ async function request<T>(
         `Bybit ${mode} API credentials are not configured — set BYBIT_${mode === "testnet" ? "TESTNET_" : ""}API_KEY / _SECRET in .env.`,
       );
     }
-    const timestamp = Date.now().toString();
+    const timestamp = (Date.now() + serverTimeOffsetMs).toString();
     const signPayload = timestamp + creds.key + RECV_WINDOW + (method === "GET" ? queryString : bodyString);
     headers["X-BAPI-API-KEY"] = creds.key;
     headers["X-BAPI-TIMESTAMP"] = timestamp;
@@ -96,7 +116,18 @@ async function request<T>(
       throw new Error(`Bybit HTTP ${res.status} on ${path}`);
     }
     const envelope = (await res.json()) as BybitEnvelope<T>;
+    updateServerTimeOffset(envelope.time);
+
     if (envelope.retCode !== 0) {
+      // A timestamp/recv_window rejection means our offset was stale (or
+      // this was the very first signed request, before any offset was
+      // ever measured) — the envelope we just parsed carries the correct
+      // server time regardless of retCode, so the offset above is already
+      // fixed. Retry exactly once with it before giving up.
+      if (requireAuth && envelope.retCode === TIMESTAMP_ERROR_RETCODE && !isRetryAfterTimestampError) {
+        logger.warn({ path, mode }, "Bybit rejected request timestamp — resyncing clock offset and retrying once.");
+        return request<T>(mode, method, path, params, requireAuth, true);
+      }
       recordProviderFailure("bybit", `retCode ${envelope.retCode}: ${envelope.retMsg}`);
       throw new BybitApiError(envelope.retCode, envelope.retMsg);
     }
