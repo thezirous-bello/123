@@ -22,8 +22,8 @@ describe("bybit client — clock drift resilience", () => {
     // container/VM with clock drift, exactly like the user's reported error.
     const serverTimeMs = Date.now() + 10_000;
     let callCount = 0;
-    let firstAttemptTimestamp: string | null = null;
-    let secondAttemptTimestamp: string | null = null;
+    let firstAttemptTimestamp: string | undefined;
+    let secondAttemptTimestamp: string | undefined;
 
     fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
       callCount++;

@@ -201,7 +201,7 @@ interface InstrumentInfoRow {
   status: string;
   // Linear: qtyStep. Spot: basePrecision instead (no qtyStep field at all) —
   // verified against Bybit's own SDK type defs, these genuinely differ.
-  lotSizeFilter: { qtyStep?: string; basePrecision?: string; minOrderQty: string };
+  lotSizeFilter: { qtyStep?: string; basePrecision?: string; minOrderQty: string; maxOrderQty?: string };
   priceFilter: { tickSize: string };
   // Spot instruments have no leverageFilter at all (spot has no leverage).
   leverageFilter?: { minLeverage: string; maxLeverage: string };
@@ -217,13 +217,18 @@ export interface InstrumentInfo {
   tradingActive: boolean;
   qtyStep: number;
   minOrderQty: number;
+  maxOrderQty: number;
   tickSize: number;
   maxLeverage: number;
 }
 
 /** Every symbol's quantity/price rounding rules (and max leverage, for
  * linear only — spot instruments report maxLeverage as 1) — required before
- * placing any order so qty/price aren't rejected for wrong precision. */
+ * placing any order so qty/price aren't rejected for wrong precision.
+ * maxOrderQty in particular matters a lot for low-priced/high-supply coins:
+ * a leveraged position sized purely from equity/leverage/price can demand
+ * far more raw contracts than Bybit allows in a single order, well before
+ * any USD notional limit is even relevant. */
 export async function getInstrumentInfo(
   symbol: string,
   mode: BybitMode = "testnet",
@@ -237,6 +242,7 @@ export async function getInstrumentInfo(
     tradingActive: row.status === "Trading",
     qtyStep: Number(row.lotSizeFilter.qtyStep ?? row.lotSizeFilter.basePrecision ?? 0.001),
     minOrderQty: Number(row.lotSizeFilter.minOrderQty),
+    maxOrderQty: row.lotSizeFilter.maxOrderQty ? Number(row.lotSizeFilter.maxOrderQty) : Infinity,
     tickSize: Number(row.priceFilter.tickSize),
     maxLeverage: row.leverageFilter ? Number(row.leverageFilter.maxLeverage) : 1,
   };

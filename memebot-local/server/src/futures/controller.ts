@@ -252,8 +252,16 @@ async function tryEnterSignal(signalId: string, candidate: Stage1Candidate, conf
     return;
   }
 
-  const equityUsd = new Decimal(wallet.totalEquityUsd);
   const availableUsd = new Decimal(wallet.availableBalanceUsd);
+  // Size off whichever is smaller of totalEquity and availableBalance, not
+  // totalEquity alone. On a Bybit UNIFIED account totalEquity can include
+  // value that isn't actually deployable as new margin right now (locked
+  // in other positions, cross-collateral valuations, etc.) — sizing
+  // against it produces a position that's mathematically "N% of balance"
+  // but not actually affordable, which the margin_available risk check
+  // then always rejects. Capping at availableBalance keeps the sizing
+  // grounded in what can genuinely be spent.
+  const equityUsd = Decimal.min(new Decimal(wallet.totalEquityUsd), availableUsd);
   const stopLossDistancePct = (Math.abs(candidate.entryPrice - candidate.stopLoss) / candidate.entryPrice) * 100;
   // The strategy's fixed 3-4% stop-loss can outrun the liquidation safety
   // buffer at the top of its 15-30x leverage range — clamp down to whatever
@@ -267,6 +275,7 @@ async function tryEnterSignal(signalId: string, candidate: Stage1Candidate, conf
     positionSizePct: candidate.positionSizePct,
     leverage,
     qtyStep: instrument.qtyStep,
+    maxOrderQty: instrument.maxOrderQty,
   });
 
   if (sized.qty.lte(0) || sized.qty.lt(instrument.minOrderQty)) {

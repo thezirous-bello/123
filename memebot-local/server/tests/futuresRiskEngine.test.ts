@@ -165,4 +165,36 @@ describe("computeFuturesPositionSize", () => {
     expect(high.notionalUsd.toNumber()).toBeCloseTo(low.notionalUsd.toNumber() * 2, -1);
     expect(high.marginUsd.toNumber()).toBeCloseTo(low.marginUsd.toNumber(), 0);
   });
+
+  it("clamps qty to the instrument's maxOrderQty instead of exceeding it", () => {
+    // A low-priced, high-leverage position on plenty of equity can easily
+    // demand far more raw contracts than a single order is allowed to hold
+    // — this was going straight to Bybit and getting rejected with
+    // "order_qty exceeds max_qty" before the clamp existed.
+    const result = computeFuturesPositionSize({
+      equityUsd: new Decimal(10_000),
+      entryPrice: new Decimal(0.013244), // e.g. COTIUSDT
+      positionSizePct: 35,
+      leverage: 22,
+      qtyStep: 1,
+      maxOrderQty: 2_219_000,
+    });
+    expect(result.qty.toNumber()).toBeLessThanOrEqual(2_219_000);
+    // notional/margin must be recomputed from the clamped qty, not the
+    // unclamped target, so they stay internally consistent.
+    expect(result.notionalUsd.toNumber()).toBeCloseTo(result.qty.toNumber() * 0.013244, 0);
+    expect(result.marginUsd.toNumber()).toBeCloseTo(result.notionalUsd.toNumber() / 22, 2);
+  });
+
+  it("does not clamp when qty is already within maxOrderQty", () => {
+    const result = computeFuturesPositionSize({
+      equityUsd: new Decimal(1000),
+      entryPrice: new Decimal(100),
+      positionSizePct: 40,
+      leverage: 25,
+      qtyStep: 0.001,
+      maxOrderQty: 1_000_000,
+    });
+    expect(result.marginUsd.toNumber()).toBeCloseTo(400, 0);
+  });
 });

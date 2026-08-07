@@ -152,18 +152,31 @@ export function assessFuturesEntryRisk(input: FuturesEntryRiskInput): FuturesRis
  * notional exposure, then leverage determines how much margin that
  * actually costs. This is deliberately NOT risk-based sizing (unlike the
  * spot/meme bots) — the strategy explicitly specifies size as a % of
- * balance, not a % risked to stop-loss. */
+ * balance, not a % risked to stop-loss.
+ *
+ * qty is clamped to the instrument's own maxOrderQty (Bybit rejects any
+ * order above it with retCode "order_qty > max_qty", a hard exchange
+ * limit unrelated to our own risk checks) — without this, a leveraged
+ * position on a low-priced/high-supply coin can easily demand far more raw
+ * contracts than a single order is allowed to hold, and the resulting
+ * notional/margin below are recomputed from the clamped qty so the two
+ * numbers stay consistent with what actually gets submitted. */
 export function computeFuturesPositionSize(params: {
   equityUsd: Decimal;
   entryPrice: Decimal;
   positionSizePct: number;
   leverage: number;
   qtyStep: number;
+  maxOrderQty?: number;
 }): { qty: Decimal; notionalUsd: Decimal; marginUsd: Decimal } {
   const notionalTarget = params.equityUsd.times(params.positionSizePct / 100).times(params.leverage);
   const rawQty = notionalTarget.div(params.entryPrice);
   const step = new Decimal(params.qtyStep || 0.001);
-  const qty = rawQty.div(step).floor().times(step);
+  let qty = rawQty.div(step).floor().times(step);
+  if (params.maxOrderQty !== undefined && Number.isFinite(params.maxOrderQty)) {
+    const maxQty = new Decimal(params.maxOrderQty).div(step).floor().times(step);
+    if (qty.gt(maxQty)) qty = maxQty;
+  }
   const notionalUsd = qty.times(params.entryPrice);
   const marginUsd = notionalUsd.div(params.leverage);
   return { qty, notionalUsd, marginUsd };
