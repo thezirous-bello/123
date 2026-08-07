@@ -433,22 +433,24 @@ function ConfigEditor({ config, busy, onSave }: { config: FuturesStrategyConfig;
       </div>
 
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">LONG setup (pulls back to VWAP/EMA20/support)</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">LONG setup (RSI band + StochRSI are the only hard gates; rest score)</h4>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {field("pullbackMaxDistancePct", "Pullback max distance %")}
           {field("rsiLongMin", "Min RSI", 1)}
           {field("rsiLongMax", "Max RSI", 1)}
-          {field("volumeSpikeMultiplier", "Volume spike x")}
-          {field("stochRsiCrossoverLookback", "StochRSI crossover lookback", 1)}
+          {field("stochRsiLongMaxK", "Max StochRSI K", 1)}
           {field("fundingLongMaxPct", "Max funding rate %")}
+          {field("pullbackMaxDistancePct", "Pullback bonus: max distance %")}
+          {field("volumeSpikeMultiplier", "Volume spike bonus x")}
+          {field("stochRsiCrossoverLookback", "Fresh-crossover bonus lookback", 1)}
         </div>
       </div>
 
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">SHORT setup (rejects VWAP/EMA20/resistance)</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">SHORT setup (RSI band + StochRSI are the only hard gates; rest score)</h4>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {field("rsiShortMin", "Min RSI", 1)}
           {field("rsiShortMax", "Max RSI", 1)}
+          {field("stochRsiShortMinK", "Min StochRSI K", 1)}
           {field("fundingShortMinPct", "Min funding rate %")}
         </div>
       </div>

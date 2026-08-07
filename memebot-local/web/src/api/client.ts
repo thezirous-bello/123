@@ -482,6 +482,8 @@ export interface FuturesStrategyConfig {
   rsiLongMax: number;
   rsiShortMin: number;
   rsiShortMax: number;
+  stochRsiLongMaxK: number;
+  stochRsiShortMinK: number;
   volumeSpikeMultiplier: number;
   stochRsiCrossoverLookback: number;
   breakoutPreferenceEnabled: boolean;

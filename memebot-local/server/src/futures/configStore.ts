@@ -4,6 +4,26 @@ import { FuturesStrategyConfigSchema, type FuturesStrategyConfig } from "./schem
 
 const SETTINGS_KEY = "futures_strategy_config";
 
+/** The entry-gate defaults from before Stage 1 was loosened (RSI band +
+ * StochRSI crossover-on-the-exact-candle + pullback + volume spike, all
+ * AND'd together — see signalEngine.ts's history). A saved settings row
+ * still parses fine against the current schema even after that change
+ * (every field has a Zod default, so nothing here is a *required* key) —
+ * which means an existing installation's old, overly-strict values would
+ * otherwise persist forever and the loosening would never actually take
+ * effect for anyone who already ran the bot once. */
+function matchesPreLooseningEntryGateDefaults(cfg: FuturesStrategyConfig): boolean {
+  return (
+    cfg.rsiLongMin === 35 &&
+    cfg.rsiLongMax === 50 &&
+    cfg.rsiShortMin === 50 &&
+    cfg.rsiShortMax === 65 &&
+    cfg.minDailyMovePct === 8 &&
+    cfg.oiIncreasingRequired === true &&
+    cfg.volumeIncreasingRequired === true
+  );
+}
+
 export function getFuturesStrategyConfig(): FuturesStrategyConfig {
   const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(SETTINGS_KEY) as { value: string } | undefined;
   if (!row) {
@@ -12,7 +32,23 @@ export function getFuturesStrategyConfig(): FuturesStrategyConfig {
     return defaults;
   }
   const result = FuturesStrategyConfigSchema.safeParse(JSON.parse(row.value));
-  if (result.success) return result.data;
+  if (result.success) {
+    if (matchesPreLooseningEntryGateDefaults(result.data)) {
+      const fresh = FuturesStrategyConfigSchema.parse({});
+      logger.warn("Futures strategy config was still at the old, overly-strict entry-gate defaults — relaxing to the new defaults so Stage 1 can actually qualify setups.");
+      return saveFuturesStrategyConfig({
+        ...result.data,
+        rsiLongMin: fresh.rsiLongMin,
+        rsiLongMax: fresh.rsiLongMax,
+        rsiShortMin: fresh.rsiShortMin,
+        rsiShortMax: fresh.rsiShortMax,
+        minDailyMovePct: fresh.minDailyMovePct,
+        oiIncreasingRequired: fresh.oiIncreasingRequired,
+        volumeIncreasingRequired: fresh.volumeIncreasingRequired,
+      });
+    }
+    return result.data;
+  }
   // A saved config from a previous strategy version (the schema is
   // .strict(), so field-set changes always fail here) — reset to the
   // current strategy's defaults rather than crash the bot on startup.

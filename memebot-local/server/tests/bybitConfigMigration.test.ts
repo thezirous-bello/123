@@ -73,3 +73,50 @@ describe("futures config reset on schema mismatch", () => {
     expect(config.autoTopNByVolume).toBe(50);
   });
 });
+
+describe("futures entry-gate loosening upgrade", () => {
+  // Stage 1 used to AND five conditions together (pullback + RSI band + RSI
+  // turning + a same-candle StochRSI crossover + a volume spike), which made
+  // qualifying setups so rare the bot effectively never opened a position.
+  // A settings row saved under that generation still parses fine against
+  // today's schema (every field has a Zod default), so without this
+  // fingerprint-based upgrade the old strict values would persist forever
+  // and the loosening would never actually take effect for anyone who'd
+  // already run the bot.
+  it("relaxes entry gates still at their exact pre-loosening defaults", () => {
+    seedLegacyConfig("futures_strategy_config", {
+      rsiLongMin: 35,
+      rsiLongMax: 50,
+      rsiShortMin: 50,
+      rsiShortMax: 65,
+      minDailyMovePct: 8,
+      oiIncreasingRequired: true,
+      volumeIncreasingRequired: true,
+    });
+    const config = getFuturesStrategyConfig();
+    expect(config.rsiLongMin).toBe(20);
+    expect(config.rsiLongMax).toBe(65);
+    expect(config.rsiShortMin).toBe(35);
+    expect(config.rsiShortMax).toBe(80);
+    expect(config.minDailyMovePct).toBe(2);
+    expect(config.oiIncreasingRequired).toBe(false);
+    expect(config.volumeIncreasingRequired).toBe(false);
+
+    const row = db.prepare("SELECT value FROM settings WHERE key = ?").get("futures_strategy_config") as { value: string };
+    expect(JSON.parse(row.value).rsiLongMin).toBe(20);
+  });
+
+  it("leaves deliberately-customized entry-gate values untouched", () => {
+    seedLegacyConfig("futures_strategy_config", {
+      rsiLongMin: 40, // doesn't match the exact old-default fingerprint
+      rsiLongMax: 50,
+      rsiShortMin: 50,
+      rsiShortMax: 65,
+      minDailyMovePct: 8,
+      oiIncreasingRequired: true,
+      volumeIncreasingRequired: true,
+    });
+    const config = getFuturesStrategyConfig();
+    expect(config.rsiLongMin).toBe(40);
+  });
+});
