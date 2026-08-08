@@ -65,7 +65,7 @@ export function DecisionEnginePanel() {
           </div>
           <ul className="space-y-1 font-mono text-xs">
             {(latest.details.conditions ?? []).map((c, i) => (
-              <li key={i} className={c.passed ? "text-[#5dffab]" : "text-red-400"}>
+              <li key={i} className={c.passed ? "text-[#4DFFD6]" : "text-red-400"}>
                 {c.passed ? "✓" : "✗"} {c.name}
                 <span className="ml-2 text-white/30">— {c.detail}</span>
               </li>

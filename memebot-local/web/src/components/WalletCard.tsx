@@ -25,7 +25,7 @@ export function WalletCard({ mode }: { mode: "paper" | "live" }) {
   return (
     <Panel title="Wallet Balance">
       {mode === "paper" && paperAccount && (
-        <div className="mb-4 rounded-lg border border-violet-500/20 bg-violet-500/5 p-3">
+        <div className="mb-4 rounded-sm border border-violet-500/20 bg-violet-500/5 p-3">
           <p className="text-xs uppercase tracking-wide text-white/50">Paper cash balance</p>
           <p className="text-2xl font-bold text-violet-200">${Number(paperAccount.cashBalanceUsd).toFixed(2)}</p>
           <p className="text-xs text-white/40">Started at ${Number(paperAccount.startingBalanceUsd).toFixed(2)} (virtual, no real funds)</p>

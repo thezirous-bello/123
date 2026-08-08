@@ -46,12 +46,12 @@ export function TokenCardsRow({ mode }: { mode: "paper" | "live" }) {
           const currentPrice = history.length > 0 ? (history[history.length - 1]?.priceUsd ?? entry) : entry;
           const pnlPct = entry > 0 ? ((currentPrice - entry) / entry) * 100 : 0;
           const positive = pnlPct >= 0;
-          const color = positive ? "#22ff88" : "#f87171";
+          const color = positive ? "#00FFC8" : "#FF3B5C";
 
           return (
             <div
               key={position.id}
-              className={`min-w-[210px] flex-shrink-0 rounded-lg border bg-black/40 p-3 ${positive ? "border-emerald-500/40" : "border-red-500/40"}`}
+              className={`min-w-[210px] flex-shrink-0 rounded-sm border bg-black/40 p-3 ${positive ? "border-emerald-500/40" : "border-red-500/40"}`}
             >
               <div className="flex items-baseline justify-between">
                 <p className="font-mono text-sm font-bold">${position.symbol ?? position.mint.slice(0, 6)}</p>

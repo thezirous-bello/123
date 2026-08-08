@@ -34,11 +34,11 @@ export function BybitWalletCard({ botLabel, wallet }: { botLabel: string; wallet
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3">
+          <div className="rounded-sm border border-violet-500/20 bg-violet-500/5 p-3">
             <p className="text-xs uppercase tracking-wide text-white/50">Total equity</p>
             <p className="text-2xl font-bold text-violet-200">{wallet.totalEquityUsd != null ? `$${wallet.totalEquityUsd.toFixed(2)}` : "—"}</p>
           </div>
-          <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+          <div className="rounded-sm border border-white/10 bg-white/5 p-3">
             <p className="text-xs uppercase tracking-wide text-white/50">Available balance</p>
             <p className="text-2xl font-bold">{wallet.availableBalanceUsd != null ? `$${wallet.availableBalanceUsd.toFixed(2)}` : "—"}</p>
           </div>

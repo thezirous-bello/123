@@ -25,7 +25,7 @@ function shortMint(mint: string): string {
 
 const LEVEL_STYLE: Record<LogEntry["level"], string> = {
   debug: "text-white/25",
-  info: "text-[#5dffab] text-glow-green",
+  info: "text-[#4DFFD6] text-glow-green",
   warn: "text-amber-300",
   error: "text-red-400 text-glow-red",
 };
@@ -190,12 +190,12 @@ function RadarPanel({
           const flash = flashes[node.mint];
           const isOpen = openMints.has(node.mint);
 
-          let dotColor = "#22ff88";
-          if (flash?.kind === "scan") dotColor = "#c084fc";
-          if (flash?.kind === "buy") dotColor = "#22ff88";
-          if (flash?.kind === "sell") dotColor = "#f87171";
-          if (!flash && isOpen) dotColor = "#22ff88";
-          if (!flash && !isOpen) dotColor = "#38bdf8";
+          let dotColor = "#00FFC8";
+          if (flash?.kind === "scan") dotColor = "#8B5CF6";
+          if (flash?.kind === "buy") dotColor = "#00FFC8";
+          if (flash?.kind === "sell") dotColor = "#FF3B5C";
+          if (!flash && isOpen) dotColor = "#00FFC8";
+          if (!flash && !isOpen) dotColor = "#00E5FF";
 
           return (
             <div key={node.mint} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: x, top: y }} title={node.symbol ?? node.mint}>
@@ -248,12 +248,12 @@ function TerminalPanel({
       title="Live Terminal"
       action={
         <div className="flex items-center gap-3 font-mono text-[11px] text-white/40">
-          <span className={running ? "text-glow-green text-[#5dffab]" : "text-white/30"}>{running ? "● LINK ACTIVE" : "○ IDLE"}</span>
+          <span className={running ? "text-glow-green text-[#4DFFD6]" : "text-white/30"}>{running ? "● LINK ACTIVE" : "○ IDLE"}</span>
           <span>{eventsPerMin} evt/min</span>
         </div>
       }
     >
-      <div ref={scrollRef} className="terminal-surface h-96 overflow-y-auto rounded-lg border border-white/10 p-3 font-mono text-[12px] leading-relaxed">
+      <div ref={scrollRef} className="terminal-surface h-96 overflow-y-auto rounded-sm border border-white/10 p-3 font-mono text-[12px] leading-relaxed">
         {logs.length === 0 && <p className="text-white/30">Waiting for activity...</p>}
         {logs.map((log) => (
           <div key={log.id} className={LEVEL_STYLE[log.level]}>
@@ -281,7 +281,7 @@ function TransactionStrip({ trades }: { trades: Trade[] }) {
             return (
               <div
                 key={t.id}
-                className={`animate-flash-in min-w-[180px] flex-shrink-0 rounded-lg border bg-black/40 p-3 font-mono ${borderClass}`}
+                className={`animate-flash-in min-w-[180px] flex-shrink-0 rounded-sm border bg-black/40 p-3 font-mono ${borderClass}`}
               >
                 <div className="flex items-center justify-between">
                   <Badge tone={failed ? "danger" : isBuy ? "good" : "danger"}>{failed ? "FAILED" : isBuy ? "OPEN" : "CLOSE"}</Badge>
@@ -289,7 +289,7 @@ function TransactionStrip({ trades }: { trades: Trade[] }) {
                 </div>
                 <p className="mt-2 text-sm font-semibold">{t.symbol ?? shortMint(t.mint)}</p>
                 <p className="text-xs text-white/50">{shortMint(t.mint)}</p>
-                <p className={`mt-1 text-sm font-bold ${isBuy ? "text-[#5dffab]" : "text-red-400"}`}>${Number(t.amount_usd).toFixed(2)}</p>
+                <p className={`mt-1 text-sm font-bold ${isBuy ? "text-[#4DFFD6]" : "text-red-400"}`}>${Number(t.amount_usd).toFixed(2)}</p>
                 <p className="text-[10px] text-white/30">{new Date(t.created_at).toLocaleTimeString()}</p>
               </div>
             );

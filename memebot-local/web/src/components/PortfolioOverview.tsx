@@ -28,7 +28,7 @@ export function PortfolioOverview({ mode }: { mode: "paper" | "live" }) {
       <p className="text-xs uppercase tracking-wide text-white/40">
         {mode === "paper" ? "Paper" : "Live"} Balance {mode === "live" && "(cash side only)"}
       </p>
-      <p className="text-4xl font-bold tracking-tight text-glow-green text-[#5dffab]">
+      <p className="text-4xl font-bold tracking-tight text-glow-green text-[#4DFFD6]">
         {current !== null ? `$${current.toFixed(2)}` : "—"}
       </p>
       {change !== null && changePct !== null && (
@@ -39,7 +39,7 @@ export function PortfolioOverview({ mode }: { mode: "paper" | "live" }) {
         </p>
       )}
       <div className="mt-3">
-        <Sparkline values={curve.map((p) => p.balance)} color={positive ? "#22ff88" : "#f87171"} width={280} height={64} />
+        <Sparkline values={curve.map((p) => p.balance)} color={positive ? "#00FFC8" : "#FF3B5C"} width={280} height={64} />
       </div>
       {curve.length <= 1 && <p className="mt-2 text-xs text-white/30">No trades in the last 24h yet — curve will fill in as the bot trades.</p>}
     </Panel>

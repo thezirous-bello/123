@@ -61,7 +61,7 @@ export function SpotPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-[#131318] p-4">
+      <div className="flex flex-col gap-3 rounded-sm border border-white/10 bg-[#0B1017] p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={status.running ? "good" : "neutral"}>{status.running ? "RUNNING" : "STOPPED"}</Badge>
           <Badge tone={status.mode === "live" ? "danger" : "accent"}>{status.mode === "live" ? "LIVE (MAINNET)" : "TESTNET"}</Badge>
@@ -77,7 +77,7 @@ export function SpotPanel() {
             <button
               disabled={busy || status.emergencyStopped}
               onClick={() => run(() => api.spotStart())}
-              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
+              className="rounded-sm bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
             >
               Start Spot Bot
             </button>
@@ -85,7 +85,7 @@ export function SpotPanel() {
             <button
               disabled={busy}
               onClick={() => run(() => api.spotStop())}
-              className="rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-40"
+              className="rounded-sm bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-40"
             >
               Stop Spot Bot
             </button>
@@ -94,7 +94,7 @@ export function SpotPanel() {
           <button
             disabled={busy}
             onClick={() => run(() => api.updateSpotConfig({ enabled: !config.enabled }))}
-            className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
+            className="rounded-sm border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
           >
             {config.enabled ? "Disable Strategy" : "Enable Strategy"}
           </button>
@@ -103,7 +103,7 @@ export function SpotPanel() {
             <button
               disabled={busy}
               onClick={() => setShowModeConfirm(true)}
-              className="rounded-lg border border-red-500/40 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+              className="rounded-sm border border-red-500/40 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-40"
             >
               Request Live (Mainnet) Spot Trading
             </button>
@@ -111,7 +111,7 @@ export function SpotPanel() {
             <button
               disabled={busy}
               onClick={() => run(() => api.spotSetMode("testnet", true))}
-              className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
+              className="rounded-sm border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
             >
               Switch to Testnet
             </button>
@@ -121,7 +121,7 @@ export function SpotPanel() {
             <button
               disabled={busy}
               onClick={() => run(() => api.spotResume())}
-              className="ml-auto rounded-lg bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/30 disabled:opacity-40"
+              className="ml-auto rounded-sm bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/30 disabled:opacity-40"
             >
               Resume From Emergency Stop
             </button>
@@ -129,7 +129,7 @@ export function SpotPanel() {
             <button
               disabled={busy}
               onClick={() => setShowEmergencyConfirm(true)}
-              className="ml-auto rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-40"
+              className="ml-auto rounded-sm bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-40"
             >
               EMERGENCY STOP
             </button>
@@ -314,7 +314,7 @@ export function SpotPanel() {
 function SignalRow({ signal }: { signal: SpotSignal }) {
   const tone = signal.status === "filled" ? "good" : signal.status === "cancelled" || signal.status === "expired" ? "danger" : "accent";
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/5 bg-black/20 px-3 py-2 font-mono text-xs">
+    <div className="flex flex-wrap items-center gap-2 rounded-sm border border-white/5 bg-black/20 px-3 py-2 font-mono text-xs">
       <Badge tone={tone}>{signal.status.toUpperCase()}</Badge>
       <span className="font-semibold text-white/80">{signal.symbol}</span>
       <span className="text-white/50">{signal.side}</span>
@@ -330,7 +330,7 @@ function SignalRow({ signal }: { signal: SpotSignal }) {
 function PositionRow({ position, onClose, busy }: { position: SpotPosition; onClose?: () => void; busy?: boolean }) {
   const pnl = Number(position.realizedPnlUsd);
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/5 bg-black/20 px-3 py-2 font-mono text-xs">
+    <div className="flex flex-wrap items-center gap-2 rounded-sm border border-white/5 bg-black/20 px-3 py-2 font-mono text-xs">
       <Badge tone="good">LONG</Badge>
       <span className="font-semibold text-white/80">{position.symbol}</span>
       <Badge tone={position.mode === "live" ? "danger" : "accent"}>{position.mode}</Badge>
@@ -445,7 +445,7 @@ function ConfigEditor({ config, busy, onSave }: { config: SpotStrategyConfig; bu
       <button
         disabled={busy}
         onClick={() => onSave(draft)}
-        className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
+        className="rounded-sm bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
       >
         Save Config
       </button>
@@ -470,16 +470,16 @@ function ConfirmModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#17171f] p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-sm border border-white/10 bg-[#0D131A] p-6 shadow-2xl">
         <h3 className="mb-3 text-lg font-bold">{title}</h3>
         {body}
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onCancel} className="rounded-lg px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/10">
+          <button onClick={onCancel} className="rounded-sm px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/10">
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className={`rounded-lg px-4 py-2 text-sm font-bold text-white ${danger ? "bg-red-600 hover:bg-red-500" : "bg-violet-600 hover:bg-violet-500"}`}
+            className={`rounded-sm px-4 py-2 text-sm font-bold text-white ${danger ? "bg-red-600 hover:bg-red-500" : "bg-violet-600 hover:bg-violet-500"}`}
           >
             {confirmLabel}
           </button>

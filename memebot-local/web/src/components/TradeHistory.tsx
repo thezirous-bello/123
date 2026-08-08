@@ -19,7 +19,7 @@ export function TradeHistory() {
       ) : (
         <div className="max-h-[32rem] overflow-y-auto">
           <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 bg-[#131318] text-xs uppercase text-white/40">
+            <thead className="sticky top-0 bg-[#0B1017] text-xs uppercase text-white/40">
               <tr>
                 <th className="pb-2">Time</th>
                 <th className="pb-2">Side</th>

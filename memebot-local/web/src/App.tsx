@@ -15,6 +15,7 @@ import { SpotPanel } from "./components/SpotPanel.js";
 import { FuturesPanel } from "./components/FuturesPanel.js";
 import { ArbitragePanel } from "./components/ArbitragePanel.js";
 import { AllBotsBalances } from "./components/AllBotsBalances.js";
+import { CommandBar } from "./components/CommandBar.js";
 
 const TABS = ["Dashboard", "Live", "Strategy", "Scanner", "Positions", "History", "Risk", "Logs"] as const;
 type Tab = (typeof TABS)[number];
@@ -38,21 +39,21 @@ export default function App() {
   }, [tick]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <header className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-7xl px-4 py-6">
+      <header className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">
-            Meme<span className="text-violet-400">Bot</span> Local
+          <h1 className="font-mono text-xl font-bold tracking-tight text-white/90">
+            MEME<span className="text-[#FF2D9B]" style={{ textShadow: "0 0 10px rgba(255,45,155,0.5)" }}>BOT</span> <span className="text-white/30">LOCAL</span>
           </h1>
           <p className="text-xs text-white/40">Local Solana meme-coin trading bot — runs only on this machine.</p>
         </div>
-        <nav className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
+        <nav className="flex flex-wrap gap-1 rounded-sm border border-[#1b2530] bg-[#0B1017]/80 p-1 font-mono">
           {TABS.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                tab === t ? "bg-violet-600 text-white" : "text-white/60 hover:bg-white/10"
+              className={`rounded-sm px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition ${
+                tab === t ? "bg-[#FF2D9B]/15 text-[#FF2D9B] shadow-[inset_0_0_0_1px_rgba(255,45,155,0.4)]" : "text-white/50 hover:bg-white/5 hover:text-white/80"
               }`}
             >
               {t}
@@ -60,6 +61,8 @@ export default function App() {
           ))}
         </nav>
       </header>
+
+      <CommandBar running={status?.running ?? false} />
 
       <div className="mb-6">
         <StatusBar status={status} onChanged={() => api.status().then(setStatus)} />
@@ -80,13 +83,13 @@ export default function App() {
 
       {tab === "Live" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1 w-fit">
+          <div className="flex w-fit items-center gap-1 rounded-sm border border-[#1b2530] bg-[#0B1017]/80 p-1 font-mono">
             {(["meme", "spot", "futures", "arb"] as const).map((kind) => (
               <button
                 key={kind}
                 onClick={() => setBotKind(kind)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                  botKind === kind ? "bg-violet-600 text-white" : "text-white/60 hover:bg-white/10"
+                className={`rounded-sm px-3 py-1.5 text-xs font-medium uppercase tracking-wide transition ${
+                  botKind === kind ? "bg-[#00E5FF]/15 text-[#00E5FF] shadow-[inset_0_0_0_1px_rgba(0,229,255,0.4)]" : "text-white/50 hover:bg-white/5 hover:text-white/80"
                 }`}
               >
                 {BOT_KIND_LABELS[kind]}

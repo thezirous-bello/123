@@ -81,7 +81,7 @@ export function TokenScanner() {
           <button
             onClick={discoverNow}
             disabled={discovering}
-            className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
+            className="rounded-sm bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
           >
             {discovering ? "Discovering…" : "Discover Now"}
           </button>
@@ -97,7 +97,7 @@ export function TokenScanner() {
         ) : (
           <div className="max-h-64 overflow-y-auto">
             <table className="w-full text-left text-sm">
-              <thead className="sticky top-0 bg-[#131318] text-xs uppercase text-white/40">
+              <thead className="sticky top-0 bg-[#0B1017] text-xs uppercase text-white/40">
                 <tr>
                   <th className="pb-2">Token</th>
                   <th className="pb-2">Mint</th>
@@ -163,9 +163,9 @@ export function TokenScanner() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && search()}
             placeholder="Search by name, symbol, or mint address"
-            className="flex-1 rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm outline-none focus:border-violet-500"
+            className="flex-1 rounded-sm border border-white/15 bg-black/30 px-3 py-2 text-sm outline-none focus:border-violet-500"
           />
-          <button onClick={search} disabled={busy} className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40">
+          <button onClick={search} disabled={busy} className="rounded-sm bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40">
             Search
           </button>
         </div>

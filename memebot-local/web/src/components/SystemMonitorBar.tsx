@@ -31,7 +31,7 @@ export function SystemMonitorBar() {
   }, []);
 
   return (
-    <div className="terminal-surface flex flex-wrap items-center justify-between gap-4 rounded-lg border border-white/10 px-4 py-2 font-mono text-xs">
+    <div className="terminal-surface flex flex-wrap items-center justify-between gap-4 rounded-sm border border-white/10 px-4 py-2 font-mono text-xs">
       <div className="flex flex-wrap items-center gap-5 text-white/60">
         <Metric label="CPU" value={stats ? `${stats.cpuPercent.toFixed(0)}%` : "—"} warn={stats ? stats.cpuPercent > 80 : false} />
         <Metric
@@ -46,7 +46,7 @@ export function SystemMonitorBar() {
         />
         <Metric label="REQ/MIN" value={stats ? String(stats.requestsPerMin) : "—"} />
       </div>
-      <div className="text-glow-green text-[#5dffab]">{now.toLocaleTimeString()}</div>
+      <div className="text-glow-green text-[#4DFFD6]">{now.toLocaleTimeString()}</div>
     </div>
   );
 }
@@ -55,7 +55,7 @@ function Metric({ label, value, warn }: { label: string; value: string; warn?: b
   return (
     <span>
       <span className="text-white/30">{label}</span>{" "}
-      <span className={warn ? "text-amber-300" : "text-[#5dffab]"}>{value}</span>
+      <span className={warn ? "text-amber-300" : "text-[#4DFFD6]"}>{value}</span>
     </span>
   );
 }

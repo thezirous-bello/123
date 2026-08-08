@@ -6,7 +6,7 @@ export function Sparkline({
   values,
   width = 260,
   height = 60,
-  color = "#22ff88",
+  color = "#00FFC8",
   fill = true,
 }: {
   values: number[];

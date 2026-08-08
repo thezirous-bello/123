@@ -82,7 +82,7 @@ export function AllBotsBalances() {
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {tiles.map((tile) => (
-            <div key={tile.label} className={`rounded-lg border p-3 ${TONE_CLASSES[tile.tone]}`}>
+            <div key={tile.label} className={`rounded-sm border p-3 ${TONE_CLASSES[tile.tone]}`}>
               <p className="text-xs uppercase tracking-wide text-white/50">{tile.label}</p>
               <p className="text-xl font-bold">{tile.primary}</p>
               {tile.secondary && <p className="text-[10px] uppercase tracking-wide text-white/40">{tile.secondary}</p>}

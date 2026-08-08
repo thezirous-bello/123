@@ -21,12 +21,12 @@ function statusOf(health: ProviderHealth | undefined): Status {
 
 const STATUS_COLOR: Record<Status, string> = {
   unused: "#3b4252",
-  healthy: "#22ff88",
-  degraded: "#fbbf24",
-  down: "#f87171",
+  healthy: "#00FFC8",
+  degraded: "#FFB020",
+  down: "#FF3B5C",
 };
 
-const REQUEST_COLOR = "#7fb8ff"; // outbound "request sent" pulse — distinct from the status-colored response
+const REQUEST_COLOR = "#00E5FF"; // outbound "request sent" pulse — distinct from the status-colored response
 
 function curvePath(from: { x: number; y: number }, to: { x: number; y: number }): string {
   const midX = (from.x + to.x) / 2;
@@ -104,7 +104,7 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
         <span>Real call graph + live provider health — node positions are illustrative, not geodata.</span>
         <span className="flex gap-3">
           <span>
-            CALLS <span className="text-[#5dffab]">{stats.totalCalls}</span>
+            CALLS <span className="text-[#4DFFD6]">{stats.totalCalls}</span>
           </span>
           <span>
             FAILED <span className={stats.totalFailures > 0 ? "text-amber-300" : "text-white/40"}>{stats.totalFailures}</span>
@@ -144,9 +144,9 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
         })}
 
         {/* Local hub */}
-        <circle cx={LOCAL.x} cy={LOCAL.y} r={22} fill="#a78bfa" fillOpacity={0.12} className="animate-node-idle" />
-        <circle cx={LOCAL.x} cy={LOCAL.y} r={16} fill="#a78bfa" fillOpacity={0.18} />
-        <circle cx={LOCAL.x} cy={LOCAL.y} r={7} fill="#a78bfa" style={{ filter: "drop-shadow(0 0 6px #a78bfa)" }} />
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={22} fill="#FF2D9B" fillOpacity={0.12} className="animate-node-idle" />
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={16} fill="#FF2D9B" fillOpacity={0.18} />
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={7} fill="#FF2D9B" style={{ filter: "drop-shadow(0 0 6px #FF2D9B)" }} />
         <text x={LOCAL.x} y={LOCAL.y + 40} textAnchor="middle" className="fill-white/70" style={{ fontSize: 11, fontFamily: "monospace" }}>
           {hubLabel}
         </text>
@@ -228,7 +228,7 @@ interface Particle {
   dy: number;
 }
 
-const PARTICLE_PALETTE = ["#22ff88", "#22ff88", "#22ff88", "#5dd8ff", "#a78bfa", "#f87171"];
+const PARTICLE_PALETTE = ["#00FFC8", "#00FFC8", "#00FFC8", "#00E5FF", "#FF2D9B", "#FF3B5C"];
 
 /** A dense field of small, constantly-drifting ambient particles — purely
  * decorative background motion so the map feels alive even when no real

@@ -77,7 +77,7 @@ export function RiskSettings() {
         </label>
       </div>
       {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
-      <button onClick={save} className="mt-4 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500">
+      <button onClick={save} className="mt-4 rounded-sm bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500">
         {saved ? "Saved" : "Save Risk Settings"}
       </button>
     </Panel>

@@ -56,14 +56,14 @@ export function ArbitragePanel() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-xs text-sky-300">
+      <div className="rounded-sm border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-xs text-sky-300">
         Paper-only: watches real public prices across {config.exchanges.length} exchanges and simulates buying low / selling high net of estimated fees.
         No real orders, no exchange API keys needed. A genuine cross-exchange price gap closes in seconds — real execution would need capital
         pre-funded on every exchange and much faster infrastructure than this. See it as a live "is there an edge here, and how big" instrument, not a
         money-printer.
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-[#131318] p-4">
+      <div className="flex flex-col gap-3 rounded-sm border border-white/10 bg-[#0B1017] p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={status.running ? "good" : "neutral"}>{status.running ? "RUNNING" : "STOPPED"}</Badge>
           <Badge tone={status.strategyEnabled ? "good" : "warn"}>{status.strategyEnabled ? "STRATEGY ENABLED" : "STRATEGY DISABLED"}</Badge>
@@ -76,7 +76,7 @@ export function ArbitragePanel() {
             <button
               disabled={busy || status.emergencyStopped}
               onClick={() => run(() => api.arbStart())}
-              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-40"
+              className="rounded-sm bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-40"
             >
               Start Scanner
             </button>
@@ -84,7 +84,7 @@ export function ArbitragePanel() {
             <button
               disabled={busy}
               onClick={() => run(() => api.arbStop())}
-              className="rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-40"
+              className="rounded-sm bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-40"
             >
               Stop Scanner
             </button>
@@ -93,7 +93,7 @@ export function ArbitragePanel() {
           <button
             disabled={busy}
             onClick={() => run(() => api.updateArbConfig({ enabled: !config.enabled }))}
-            className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
+            className="rounded-sm border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
           >
             {config.enabled ? "Disable Strategy" : "Enable Strategy"}
           </button>
@@ -102,7 +102,7 @@ export function ArbitragePanel() {
             <button
               disabled={busy}
               onClick={() => run(() => api.arbResume())}
-              className="ml-auto rounded-lg bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/30 disabled:opacity-40"
+              className="ml-auto rounded-sm bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/30 disabled:opacity-40"
             >
               Resume From Emergency Stop
             </button>
@@ -110,7 +110,7 @@ export function ArbitragePanel() {
             <button
               disabled={busy}
               onClick={() => setShowEmergencyConfirm(true)}
-              className="ml-auto rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-40"
+              className="ml-auto rounded-sm bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-40"
             >
               EMERGENCY STOP
             </button>
@@ -151,15 +151,15 @@ export function ArbitragePanel() {
       {wallet && (
         <Panel title="Arbitrage Paper Balance">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-3">
+            <div className="rounded-sm border border-sky-500/20 bg-sky-500/5 p-3">
               <p className="text-xs uppercase tracking-wide text-white/50">Cash balance</p>
               <p className="text-2xl font-bold text-sky-200">${Number(wallet.cashBalanceUsd).toFixed(2)}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+            <div className="rounded-sm border border-white/10 bg-white/5 p-3">
               <p className="text-xs uppercase tracking-wide text-white/50">Started at</p>
               <p className="text-2xl font-bold">${Number(wallet.startingBalanceUsd).toFixed(2)}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+            <div className="rounded-sm border border-white/10 bg-white/5 p-3">
               <p className="text-xs uppercase tracking-wide text-white/50">Realized PnL (24h)</p>
               <p className={`text-2xl font-bold ${Number(wallet.realizedPnl24hUsd) >= 0 ? "text-emerald-300" : "text-red-300"}`}>
                 ${Number(wallet.realizedPnl24hUsd).toFixed(2)}
@@ -243,7 +243,7 @@ export function ArbitragePanel() {
 
 function OpportunityRow({ opportunity }: { opportunity: ArbOpportunity }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/5 bg-black/20 px-3 py-2 font-mono text-xs">
+    <div className="flex flex-wrap items-center gap-2 rounded-sm border border-white/5 bg-black/20 px-3 py-2 font-mono text-xs">
       <Badge tone={opportunity.acted ? "good" : "neutral"}>{opportunity.acted ? "TRADED" : "SKIPPED"}</Badge>
       <span className="font-semibold text-white/80">{opportunity.symbol}</span>
       <span className="text-white/50">
@@ -350,7 +350,7 @@ function ConfigEditor({ config, busy, onSave }: { config: ArbStrategyConfig; bus
       <button
         disabled={busy}
         onClick={() => onSave(draft)}
-        className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-40"
+        className="rounded-sm bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-40"
       >
         Save Config
       </button>
@@ -373,14 +373,14 @@ function ConfirmModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#17171f] p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-sm border border-white/10 bg-[#0D131A] p-6 shadow-2xl">
         <h3 className="mb-3 text-lg font-bold">{title}</h3>
         {body}
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onCancel} className="rounded-lg px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/10">
+          <button onClick={onCancel} className="rounded-sm px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/10">
             Cancel
           </button>
-          <button onClick={onConfirm} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500">
+          <button onClick={onConfirm} className="rounded-sm bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500">
             {confirmLabel}
           </button>
         </div>

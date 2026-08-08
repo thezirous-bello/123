@@ -1,13 +1,49 @@
 @import "tailwindcss";
 
+/* ---- Cyber command-center theme --------------------------------------
+ * This overrides Tailwind's own palette tokens (not just the app-specific
+ * --color-bg/-panel/etc below), which repaints every existing bg-violet-*,
+ * text-emerald-*, border-amber-*, bg-red-*, and bg-sky-* utility class
+ * already used throughout the app — no component files need their class
+ * names touched for the base color shift. violet -> magenta (primary
+ * accent/hub), emerald -> teal/success, amber -> warning orange, red ->
+ * error red-pink, sky -> cyan (the arbitrage bot's distinct accent). */
 @theme {
-  --color-bg: #0b0b0f;
-  --color-panel: #131318;
-  --color-panel-border: #232330;
-  --color-accent: #a78bfa;
-  --color-danger: #f87171;
-  --color-warn: #fbbf24;
-  --color-good: #34d399;
+  --color-bg: #05070a;
+  --color-panel: #0b1017;
+  --color-panel-border: #1b2530;
+  --color-accent: #ff2d9b;
+  --color-danger: #ff3b5c;
+  --color-warn: #ffb020;
+  --color-good: #00ffc8;
+
+  --color-violet-200: #ffc2e4;
+  --color-violet-300: #ff96cf;
+  --color-violet-400: #ff62b8;
+  --color-violet-500: #ff2d9b;
+  --color-violet-600: #dd1480;
+
+  --color-emerald-200: #b8ffe9;
+  --color-emerald-300: #7dffd9;
+  --color-emerald-400: #35ffc0;
+  --color-emerald-500: #00ffc8;
+  --color-emerald-600: #00cca0;
+
+  --color-amber-200: #ffe1a8;
+  --color-amber-300: #ffcb70;
+  --color-amber-400: #ffbd4d;
+  --color-amber-500: #ffb020;
+
+  --color-red-200: #ffb9c8;
+  --color-red-300: #ff8fa8;
+  --color-red-400: #ff6485;
+  --color-red-500: #ff3b5c;
+  --color-red-600: #e01c40;
+
+  --color-sky-200: #a8f2ff;
+  --color-sky-300: #6fe8ff;
+  --color-sky-500: #00e5ff;
+  --color-sky-600: #00b8cc;
 }
 
 html,
@@ -18,7 +54,10 @@ body,
 
 body {
   background-color: var(--color-bg);
-  color: #e5e5ea;
+  background-image: radial-gradient(ellipse 1200px 600px at 50% -10%, rgba(255, 45, 155, 0.05), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 100% 10%, rgba(0, 229, 255, 0.04), transparent 55%);
+  background-attachment: fixed;
+  color: #dfe6ef;
 }
 
 /* ---- Live monitor: terminal / radar effects ------------------------- */
@@ -32,7 +71,7 @@ body {
       transparent 1px,
       transparent 3px
     ),
-    radial-gradient(ellipse at top, rgba(34, 255, 136, 0.06), transparent 60%), #05070a;
+    radial-gradient(ellipse at top, rgba(0, 255, 200, 0.06), transparent 60%), #05070a;
 }
 
 .crt-cursor::after {
@@ -42,7 +81,7 @@ body {
   height: 1em;
   margin-left: 2px;
   vertical-align: -0.15em;
-  background: #22ff88;
+  background: #00ffc8;
   animation: crt-blink 1s steps(1) infinite;
 }
 
@@ -151,14 +190,14 @@ body {
 }
 
 .text-glow-green {
-  text-shadow: 0 0 6px rgba(34, 255, 136, 0.65);
+  text-shadow: 0 0 6px rgba(0, 255, 200, 0.65);
 }
 .text-glow-red {
-  text-shadow: 0 0 6px rgba(248, 113, 113, 0.65);
+  text-shadow: 0 0 6px rgba(255, 59, 92, 0.65);
 }
 .border-glow-green {
-  box-shadow: 0 0 0 1px rgba(34, 255, 136, 0.5), 0 0 16px rgba(34, 255, 136, 0.25);
+  box-shadow: 0 0 0 1px rgba(0, 255, 200, 0.5), 0 0 16px rgba(0, 255, 200, 0.25);
 }
 .border-glow-red {
-  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.5), 0 0 16px rgba(248, 113, 113, 0.25);
+  box-shadow: 0 0 0 1px rgba(255, 59, 92, 0.5), 0 0 16px rgba(255, 59, 92, 0.25);
 }

@@ -26,7 +26,7 @@ export function StatusBar({ status, onChanged }: { status: BotStatus | null; onC
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-[#131318] p-4">
+    <div className="flex flex-col gap-3 rounded-sm border border-white/10 bg-[#0B1017] p-4">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={status.running ? "good" : "neutral"}>{status.running ? "RUNNING" : "STOPPED"}</Badge>
         <Badge tone={status.mode === "live" ? "danger" : "accent"}>{status.mode === "live" ? "LIVE" : "PAPER"}</Badge>
@@ -42,7 +42,7 @@ export function StatusBar({ status, onChanged }: { status: BotStatus | null; onC
           <button
             disabled={busy || status.emergencyStopped}
             onClick={() => run(() => api.start())}
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
+            className="rounded-sm bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
           >
             Start Bot
           </button>
@@ -50,7 +50,7 @@ export function StatusBar({ status, onChanged }: { status: BotStatus | null; onC
           <button
             disabled={busy}
             onClick={() => run(() => api.stop())}
-            className="rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-40"
+            className="rounded-sm bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-40"
           >
             Stop Bot
           </button>
@@ -60,7 +60,7 @@ export function StatusBar({ status, onChanged }: { status: BotStatus | null; onC
           <button
             disabled={busy}
             onClick={() => setShowModeConfirm(true)}
-            className="rounded-lg border border-red-500/40 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+            className="rounded-sm border border-red-500/40 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-40"
           >
             Request Live Trading
           </button>
@@ -68,7 +68,7 @@ export function StatusBar({ status, onChanged }: { status: BotStatus | null; onC
           <button
             disabled={busy}
             onClick={() => run(() => api.setMode("paper", true))}
-            className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
+            className="rounded-sm border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40"
           >
             Switch to Paper
           </button>
@@ -78,7 +78,7 @@ export function StatusBar({ status, onChanged }: { status: BotStatus | null; onC
           <button
             disabled={busy}
             onClick={() => setShowResumeConfirm(true)}
-            className="ml-auto rounded-lg bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/30 disabled:opacity-40"
+            className="ml-auto rounded-sm bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-300 hover:bg-amber-500/30 disabled:opacity-40"
           >
             Resume From Emergency Stop
           </button>
@@ -86,7 +86,7 @@ export function StatusBar({ status, onChanged }: { status: BotStatus | null; onC
           <button
             disabled={busy}
             onClick={() => setShowEmergencyConfirm(true)}
-            className="ml-auto rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-40"
+            className="ml-auto rounded-sm bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-40"
           >
             EMERGENCY STOP
           </button>
@@ -190,16 +190,16 @@ function ConfirmModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#17171f] p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-sm border border-white/10 bg-[#0D131A] p-6 shadow-2xl">
         <h3 className="mb-3 text-lg font-bold">{title}</h3>
         {body}
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onCancel} className="rounded-lg px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/10">
+          <button onClick={onCancel} className="rounded-sm px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/10">
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className={`rounded-lg px-4 py-2 text-sm font-bold text-white ${danger ? "bg-red-600 hover:bg-red-500" : "bg-violet-600 hover:bg-violet-500"}`}
+            className={`rounded-sm px-4 py-2 text-sm font-bold text-white ${danger ? "bg-red-600 hover:bg-red-500" : "bg-violet-600 hover:bg-violet-500"}`}
           >
             {confirmLabel}
           </button>

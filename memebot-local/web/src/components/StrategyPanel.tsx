@@ -95,7 +95,7 @@ export function StrategyPanel() {
           onChange={(e) => setInstruction(e.target.value)}
           placeholder={EXAMPLE}
           rows={4}
-          className="w-full rounded-lg border border-white/15 bg-black/30 p-3 text-sm outline-none focus:border-violet-500"
+          className="w-full rounded-sm border border-white/15 bg-black/30 p-3 text-sm outline-none focus:border-violet-500"
         />
         <div className="mt-2 flex items-center justify-between">
           <button onClick={() => setInstruction(EXAMPLE)} className="text-xs text-white/40 underline hover:text-white/70">
@@ -104,7 +104,7 @@ export function StrategyPanel() {
           <button
             disabled={busy || !instruction.trim()}
             onClick={interpret}
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
+            className="rounded-sm bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-40"
           >
             Parse Strategy
           </button>
@@ -113,7 +113,7 @@ export function StrategyPanel() {
         {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
 
         {interpretResult && !interpretResult.ok && (
-          <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+          <div className="mt-4 rounded-sm border border-red-500/30 bg-red-500/5 p-3">
             <p className="mb-1 text-sm font-semibold text-red-300">This instruction was rejected:</p>
             <ul className="list-disc space-y-1 pl-5 text-sm text-red-200/90">
               {interpretResult.errors.map((e, i) => (
@@ -124,7 +124,7 @@ export function StrategyPanel() {
         )}
 
         {interpretResult?.ok && editableRules && (
-          <div className="mt-4 space-y-3 rounded-lg border border-violet-500/25 bg-violet-500/5 p-4">
+          <div className="mt-4 space-y-3 rounded-sm border border-violet-500/25 bg-violet-500/5 p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-violet-200">
                 Parsed rules (source: {interpretResult.source === "ai" ? "AI-assisted" : "local parser"}) — review before activating
@@ -149,17 +149,17 @@ export function StrategyPanel() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Strategy name"
-              className="w-full rounded-lg border border-white/15 bg-black/30 p-2 text-sm outline-none focus:border-violet-500"
+              className="w-full rounded-sm border border-white/15 bg-black/30 p-2 text-sm outline-none focus:border-violet-500"
             />
 
             <div className="flex justify-end gap-2">
-              <button disabled={busy} onClick={saveOnly} className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10">
+              <button disabled={busy} onClick={saveOnly} className="rounded-sm border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10">
                 Save Without Activating
               </button>
               <button
                 disabled={busy}
                 onClick={saveAndActivate}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
+                className="rounded-sm bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
               >
                 Confirm &amp; Activate
               </button>
@@ -176,7 +176,7 @@ export function StrategyPanel() {
             {strategies
               .filter((s) => !s.archived)
               .map((s) => (
-                <div key={s.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 p-3">
+                <div key={s.id} className="flex items-center justify-between rounded-sm border border-white/10 bg-black/20 p-3">
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-semibold">{s.name}</p>
@@ -188,7 +188,7 @@ export function StrategyPanel() {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <button disabled={busy} onClick={() => toggle(s)} className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold hover:bg-white/10">
+                    <button disabled={busy} onClick={() => toggle(s)} className="rounded-sm border border-white/20 px-3 py-1.5 text-xs font-semibold hover:bg-white/10">
                       {s.enabled ? "Pause" : "Activate"}
                     </button>
                     <button
@@ -197,7 +197,7 @@ export function StrategyPanel() {
                         await api.duplicateStrategy(s.id);
                         setStrategies(await api.listStrategies());
                       }}
-                      className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold hover:bg-white/10"
+                      className="rounded-sm border border-white/20 px-3 py-1.5 text-xs font-semibold hover:bg-white/10"
                     >
                       Duplicate
                     </button>
@@ -207,7 +207,7 @@ export function StrategyPanel() {
                         await api.archiveStrategy(s.id);
                         setStrategies(await api.listStrategies());
                       }}
-                      className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/10"
+                      className="rounded-sm border border-white/20 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/10"
                     >
                       Archive
                     </button>
@@ -227,7 +227,7 @@ function RuleEditor({ rules, onChange }: { rules: StrategyRules; onChange: (rule
   }
 
   return (
-    <details className="rounded-lg border border-white/10 bg-black/20 p-3">
+    <details className="rounded-sm border border-white/10 bg-black/20 p-3">
       <summary className="cursor-pointer text-sm font-semibold text-white/70">Edit rules manually</summary>
       <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
         <NumberField label="Max trade (USD)" value={rules.maxTradeUsd} onChange={(v) => set("maxTradeUsd", v)} />
