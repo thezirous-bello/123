@@ -131,6 +131,25 @@ body {
   animation: node-flash 900ms ease-out;
 }
 
+@keyframes particle-drift {
+  0% {
+    transform: translate(0, 0);
+    opacity: var(--p-op, 0.4);
+  }
+  50% {
+    transform: translate(var(--dx, 3px), var(--dy, -3px));
+    opacity: calc(var(--p-op, 0.4) * 1.8);
+  }
+  100% {
+    transform: translate(0, 0);
+    opacity: var(--p-op, 0.4);
+  }
+}
+.animate-particle-drift {
+  animation: particle-drift var(--dur, 6s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
 .text-glow-green {
   text-shadow: 0 0 6px rgba(34, 255, 136, 0.65);
 }

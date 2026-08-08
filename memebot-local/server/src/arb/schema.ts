@@ -15,10 +15,29 @@ export const ArbStrategyConfigObjectSchema = z
     enabled: z.boolean().default(false),
 
     exchanges: z.array(ExchangeIdSchema).min(2).default(["binance", "bybit", "okx", "kucoin", "gateio", "mexc"]),
+    // ~100 of the most liquid coins, cross-listed with USDT pairs on
+    // essentially every exchange above — a symbol missing on a given
+    // exchange just doesn't get a quote there for that scan (see
+    // findBestOpportunity), so this list can safely run wider than any one
+    // exchange's actual overlap. Every extra symbol here costs nothing
+    // extra network-wise: each exchange's adapter is one "all tickers" call
+    // regardless of how many symbols this list has, only the in-memory
+    // Map lookups scale with it.
     symbols: z
       .array(z.string())
       .min(1)
-      .default(["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DOT", "LTC", "BCH", "TRX", "MATIC", "UNI", "ATOM", "NEAR", "APT"]),
+      .default([
+        "BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DOT",
+        "LTC", "BCH", "TRX", "MATIC", "UNI", "ATOM", "NEAR", "APT", "ARB", "OP",
+        "ICP", "FIL", "ETC", "XLM", "HBAR", "VET", "ALGO", "AAVE", "MKR", "GRT",
+        "SAND", "MANA", "AXS", "EOS", "XTZ", "THETA", "FTM", "EGLD", "FLOW", "CHZ",
+        "KAVA", "ZEC", "DASH", "COMP", "SNX", "CRV", "YFI", "ENJ", "BAT", "ZIL",
+        "ONE", "IOTA", "NEO", "WAVES", "QTUM", "OMG", "ANKR", "CELO", "ROSE", "RUNE",
+        "INJ", "DYDX", "GMX", "LDO", "RPL", "FXS", "PEPE", "SHIB", "WIF", "BONK",
+        "FLOKI", "SUI", "SEI", "TIA", "JTO", "JUP", "PYTH", "STRK", "W", "ENA",
+        "ONDO", "ORDI", "TAO", "RENDER", "FET", "AGIX", "OCEAN", "IMX", "GALA", "MASK",
+        "LRC", "1INCH", "SUSHI", "BAL", "KSM", "ZRX", "STORJ", "SKL", "CTSI", "BNT",
+      ]),
 
     scanIntervalSeconds: z.number().gt(0).default(10),
     positionSizeUsd: z.number().gt(0).default(500),
