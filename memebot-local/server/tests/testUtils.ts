@@ -17,6 +17,8 @@ const TABLES = [
   "futures_trades",
   "futures_positions",
   "futures_signals",
+  "arb_trades",
+  "arb_opportunities",
 ];
 
 /** Wipes all rows (schema stays) so each test starts from a clean, known
@@ -35,6 +37,10 @@ export function resetDb(): void {
   ).run(now);
   db.prepare(
     "UPDATE futures_bot_state SET running = 0, mode = 'testnet', emergency_stopped = 0, emergency_stopped_at = NULL, emergency_stopped_reason = NULL, consecutive_losses = 0, trading_halted_until = NULL, updated_at = ? WHERE id = 1",
+  ).run(now);
+  db.prepare("UPDATE arb_paper_account SET starting_balance_usd = '10000', cash_balance_usd = '10000', updated_at = ? WHERE id = 1").run(now);
+  db.prepare(
+    "UPDATE arb_bot_state SET running = 0, emergency_stopped = 0, emergency_stopped_at = NULL, emergency_stopped_reason = NULL, last_scan_at = NULL, total_scans = 0, updated_at = ? WHERE id = 1",
   ).run(now);
 }
 

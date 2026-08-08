@@ -73,6 +73,16 @@ async function scan(config: ReturnType<typeof getArbStrategyConfig>) {
   for (const opp of opportunities) {
     if (isArbEmergencyStopped()) break;
 
+    // findBestOpportunity always returns the best available buy/sell pair
+    // for a symbol, even when the "buy" price is actually higher than the
+    // "sell" price — that's just the normal, most-common state (no crossed
+    // market between any two exchanges right now), not a real opportunity.
+    // Logging those would read as "the bot tried to buy high and sell low,"
+    // which it never does — it only ever simulates a trade once a real
+    // positive spread clears fees below in whySkip. Don't even log the
+    // non-crossed case; it's noise, not a skipped opportunity.
+    if (opp.grossSpreadPct <= 0) continue;
+
     const skipReason = whySkip(opp, config, tradesThisScan);
     const acted = skipReason === null;
     createOpportunity({
