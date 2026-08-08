@@ -40,8 +40,8 @@ function curvePath(from: { x: number; y: number }, to: { x: number; y: number },
   return `M${from.x},${from.y} Q${midX + offsetX},${midY + offsetY} ${to.x},${to.y}`;
 }
 
-const VIEW_W = 1040;
-const VIEW_H = 680;
+const VIEW_W = 820;
+const VIEW_H = 400;
 const LOCAL = { x: VIEW_W / 2, y: VIEW_H / 2 };
 
 /** Deterministic 0..1 hash of a string, used only for stable per-node
@@ -59,16 +59,19 @@ function hash01(id: string): number {
  * matching the reference layout instead of the old fixed hand-placed grid. */
 function radialLayout(services: ServiceNode[]): Array<ServiceNode & { x: number; y: number; curve: number }> {
   const n = services.length;
-  const baseRadius = Math.min(VIEW_W, VIEW_H * 1.7) * 0.4;
+  // Separate X/Y radii (not a single circle scaled by a fudge factor) so
+  // nodes + their label text stay inside the canvas regardless of its
+  // aspect ratio, leaving fixed padding for the label above/below each dot.
+  const radiusX = VIEW_W / 2 - 95;
+  const radiusY = VIEW_H / 2 - 55;
   return services.map((s, i) => {
     const angle = (2 * Math.PI * i) / n - Math.PI / 2;
-    const jitter = hash01(s.id + i) * 46 - 23;
-    const r = baseRadius + jitter;
+    const jitter = (hash01(s.id + i) - 0.5) * 0.16;
     return {
       ...s,
-      x: LOCAL.x + Math.cos(angle) * r,
-      y: LOCAL.y + Math.sin(angle) * r * 0.82,
-      curve: 22 + hash01(s.id) * 30,
+      x: LOCAL.x + Math.cos(angle) * radiusX * (1 + jitter),
+      y: LOCAL.y + Math.sin(angle) * radiusY * (1 + jitter),
+      curve: 18 + hash01(s.id) * 22,
     };
   });
 }
@@ -174,7 +177,7 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
         </p>
       )}
 
-      <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full">
+      <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="mx-auto block w-full max-w-[720px]">
         <defs>
           <radialGradient id="hub-glow" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="#FF2D9B" stopOpacity={0.35} />
@@ -202,12 +205,12 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
 
         {/* Local hub — layered glow + rotating dashed ring, the visual
             centerpiece every connection radiates from/to. */}
-        <circle cx={LOCAL.x} cy={LOCAL.y} r={70} fill="url(#hub-glow)" />
-        <circle cx={LOCAL.x} cy={LOCAL.y} r={38} fill="none" stroke="#FF2D9B" strokeOpacity={0.35} strokeDasharray="3 5" className="animate-radar-spin" style={{ transformOrigin: `${LOCAL.x}px ${LOCAL.y}px` }} />
-        <circle cx={LOCAL.x} cy={LOCAL.y} r={26} fill="#FF2D9B" fillOpacity={0.14} className="animate-node-idle" />
-        <circle cx={LOCAL.x} cy={LOCAL.y} r={17} fill="#FF2D9B" fillOpacity={0.22} />
-        <circle cx={LOCAL.x} cy={LOCAL.y} r={9} fill="#FF2D9B" style={{ filter: "drop-shadow(0 0 10px #FF2D9B)" }} />
-        <text x={LOCAL.x} y={LOCAL.y + 52} textAnchor="middle" className="fill-white/80" style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, letterSpacing: 1 }}>
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={48} fill="url(#hub-glow)" />
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={27} fill="none" stroke="#FF2D9B" strokeOpacity={0.35} strokeDasharray="3 5" className="animate-radar-spin" style={{ transformOrigin: `${LOCAL.x}px ${LOCAL.y}px` }} />
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={19} fill="#FF2D9B" fillOpacity={0.14} className="animate-node-idle" />
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={12} fill="#FF2D9B" fillOpacity={0.22} />
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={6.5} fill="#FF2D9B" style={{ filter: "drop-shadow(0 0 8px #FF2D9B)" }} />
+        <text x={LOCAL.x} y={LOCAL.y + 38} textAnchor="middle" className="fill-white/80" style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, letterSpacing: 1 }}>
           {hubLabel}
         </text>
 
@@ -218,17 +221,17 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
           const active = !!pulses[service.id];
           return (
             <g key={`node-${service.id}`}>
-              {active && <circle cx={service.x} cy={service.y} r={14} fill="none" stroke={color} className="animate-ping-ring" />}
-              <circle cx={service.x} cy={service.y} r={7} fill={color} className={status === "healthy" ? "animate-node-idle" : undefined} style={{ filter: `drop-shadow(0 0 6px ${color})` }} />
-              <text x={service.x} y={service.y - 18} textAnchor="middle" className="fill-white/70" style={{ fontSize: 10, fontFamily: "monospace" }}>
+              {active && <circle cx={service.x} cy={service.y} r={11} fill="none" stroke={color} className="animate-ping-ring" />}
+              <circle cx={service.x} cy={service.y} r={5.5} fill={color} className={status === "healthy" ? "animate-node-idle" : undefined} style={{ filter: `drop-shadow(0 0 5px ${color})` }} />
+              <text x={service.x} y={service.y - 14} textAnchor="middle" className="fill-white/70" style={{ fontSize: 9, fontFamily: "monospace" }}>
                 {service.label}
               </text>
-              <text x={service.x} y={service.y + 22} textAnchor="middle" style={{ fontSize: 9, fontFamily: "monospace", fill: color }}>
+              <text x={service.x} y={service.y + 17} textAnchor="middle" style={{ fontSize: 8, fontFamily: "monospace", fill: color }}>
                 {status === "unused" ? "no calls yet" : status.toUpperCase()}
                 {h?.lastLatencyMs != null && status !== "unused" ? ` · ${h.lastLatencyMs}ms` : ""}
               </text>
               {h && h.totalCalls > 0 && (
-                <text x={service.x} y={service.y + 34} textAnchor="middle" className="fill-white/30" style={{ fontSize: 8, fontFamily: "monospace" }}>
+                <text x={service.x} y={service.y + 28} textAnchor="middle" className="fill-white/30" style={{ fontSize: 7, fontFamily: "monospace" }}>
                   {h.totalCalls} calls{h.totalFailures > 0 ? `, ${h.totalFailures} failed` : ""}
                 </text>
               )}
@@ -320,19 +323,23 @@ const PARTICLE_PALETTE = ["#00FFC8", "#00FFC8", "#00FFC8", "#00E5FF", "#FF2D9B",
  * instead of smooth motion). */
 function useParticleField(serviceCount: number): Particle[] {
   return useMemo(() => {
-    const count = Math.min(260, 120 + serviceCount * 14);
+    const count = Math.min(150, 70 + serviceCount * 8);
     const particles: Particle[] = [];
     for (let i = 0; i < count; i++) {
       particles.push({
-        x: 15 + Math.random() * (VIEW_W - 30),
-        y: 15 + Math.random() * (VIEW_H - 30),
+        x: 12 + Math.random() * (VIEW_W - 24),
+        y: 12 + Math.random() * (VIEW_H - 24),
         r: 0.5 + Math.random() * 1.3,
         color: PARTICLE_PALETTE[Math.floor(Math.random() * PARTICLE_PALETTE.length)]!,
-        opacity: 0.12 + Math.random() * 0.3,
-        dur: 3.5 + Math.random() * 5,
-        delay: Math.random() * 5,
-        dx: (Math.random() - 0.5) * 10,
-        dy: (Math.random() - 0.5) * 10,
+        opacity: 0.16 + Math.random() * 0.32,
+        // Short, continuously-cycling durations (was 3.5-8.5s) so the web
+        // reads as moving in real time on its own, not just during a
+        // boosted burst — the boost on top of this just makes it faster
+        // and brighter still.
+        dur: 1.6 + Math.random() * 2.2,
+        delay: Math.random() * 2,
+        dx: (Math.random() - 0.5) * 16,
+        dy: (Math.random() - 0.5) * 16,
       });
     }
     return particles;
@@ -344,7 +351,7 @@ function useParticleField(serviceCount: number): Particle[] {
  * de-duplicated — the faint "spider web" mesh texture behind the real
  * nodes. Computed once alongside the particle field itself. */
 function buildMesh(particles: Particle[]): Array<[Particle, Particle]> {
-  const maxDist = 85;
+  const maxDist = 62;
   const maxLinksPerNode = 3;
   const seen = new Set<string>();
   const lines: Array<[Particle, Particle]> = [];

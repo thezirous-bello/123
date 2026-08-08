@@ -51,9 +51,9 @@ export function MarketChartPanel({ kind }: { kind: "spot" | "futures" }) {
       {error ? (
         <p className="font-mono text-xs text-white/30">{error}</p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_220px]">
-          <CandlestickChart candles={candles} />
-          <OrderBookLadder bids={book.bids} asks={book.asks} />
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_200px]">
+          <CandlestickChart candles={candles} height={160} />
+          <OrderBookLadder bids={book.bids} asks={book.asks} rows={6} />
         </div>
       )}
     </Panel>

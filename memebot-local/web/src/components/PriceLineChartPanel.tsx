@@ -36,7 +36,7 @@ export function MemeTokenChartPanel() {
       {prices.length < 2 ? (
         <p className="font-mono text-xs text-white/30">No open position to chart yet — price history appears here once the bot holds a token.</p>
       ) : (
-        <Sparkline values={prices} width={700} height={180} color="#FF2D9B" />
+        <Sparkline values={prices} width={700} height={140} color="#FF2D9B" responsive />
       )}
     </Panel>
   );
@@ -67,7 +67,7 @@ export function ArbSpreadChartPanel() {
       {values.length < 2 ? (
         <p className="font-mono text-xs text-white/30">No crossed markets scanned yet.</p>
       ) : (
-        <Sparkline values={values} width={700} height={180} color="#00E5FF" />
+        <Sparkline values={values} width={700} height={140} color="#00E5FF" responsive />
       )}
     </Panel>
   );

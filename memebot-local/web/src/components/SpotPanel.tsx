@@ -235,7 +235,7 @@ export function SpotPanel() {
 
       <BybitWalletCard botLabel="Bybit Spot" wallet={wallet} />
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_1fr_300px]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[260px_1fr_300px]">
         <BotAnalyticsColumn stats={spotPnlStats(positions)} />
         <MarketChartPanel kind="spot" />
 

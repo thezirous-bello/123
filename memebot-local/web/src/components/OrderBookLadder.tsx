@@ -3,15 +3,14 @@ import type { OrderbookLevel } from "../api/client.js";
 /** Real bid/ask depth ladder — fed by /spot/orderbook or
  * /futures/orderbook, which proxy Bybit's own public orderbook endpoint.
  * No synthetic levels: an empty side just renders no rows. */
-export function OrderBookLadder({ bids, asks }: { bids: OrderbookLevel[]; asks: OrderbookLevel[] }) {
+export function OrderBookLadder({ bids, asks, rows = 8 }: { bids: OrderbookLevel[]; asks: OrderbookLevel[]; rows?: number }) {
   const maxSize = Math.max(1, ...bids.map((b) => b.size), ...asks.map((a) => a.size));
-  const rows = 8;
 
   return (
     <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
       <div className="space-y-0.5">
         <div className="mb-1 flex justify-between text-white/30">
-          <span>BID</span>
+          <span>ASK</span>
           <span>SIZE</span>
         </div>
         {asks
@@ -24,7 +23,7 @@ export function OrderBookLadder({ bids, asks }: { bids: OrderbookLevel[]; asks: 
       <div className="space-y-0.5">
         <div className="mb-1 flex justify-between text-white/30">
           <span>SIZE</span>
-          <span>ASK</span>
+          <span>BID</span>
         </div>
         {bids.slice(0, rows).map((b, i) => (
           <Row key={`bid-${i}`} price={b.price} size={b.size} maxSize={maxSize} color="#00FFC8" align="right" />

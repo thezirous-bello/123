@@ -8,16 +8,26 @@ export function Sparkline({
   height = 60,
   color = "#00FFC8",
   fill = true,
+  responsive = false,
 }: {
   values: number[];
   width?: number;
   height?: number;
   color?: string;
   fill?: boolean;
+  /** Stretches to the container's full width (viewBox + preserveAspectRatio)
+   * instead of rendering at a fixed pixel size — for panels whose width
+   * varies (a chart spanning a whole Panel), where a hardcoded width would
+   * either overflow or leave blank space beside a too-narrow fixed chart. */
+  responsive?: boolean;
 }) {
+  const sizeProps = responsive
+    ? { viewBox: `0 0 ${width} ${height}`, preserveAspectRatio: "none" as const, className: "w-full overflow-visible", style: { height } }
+    : { width, height, className: "overflow-visible" };
+
   if (values.length < 2) {
     return (
-      <svg width={width} height={height}>
+      <svg {...sizeProps}>
         <line x1={0} y1={height / 2} x2={width} y2={height / 2} stroke={color} strokeOpacity={0.3} strokeDasharray="4 4" />
       </svg>
     );
@@ -38,7 +48,7 @@ export function Sparkline({
   const areaPath = `${linePath} L${width},${height} L0,${height} Z`;
 
   return (
-    <svg width={width} height={height} className="overflow-visible">
+    <svg {...sizeProps}>
       {fill && <path d={areaPath} fill={color} fillOpacity={0.12} stroke="none" />}
       <path d={linePath} fill="none" stroke={color} strokeWidth={1.5} style={{ filter: `drop-shadow(0 0 3px ${color})` }} />
       <circle cx={points[points.length - 1]?.[0]} cy={points[points.length - 1]?.[1]} r={2.5} fill={color} />
