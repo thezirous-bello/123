@@ -1,12 +1,33 @@
 import { useEffect, useState } from "react";
-import { api, type ArbOpportunity, type ArbStatus, type ArbStrategyConfig, type ArbTrade, type ArbWallet, type ExchangeId } from "../api/client.js";
+import { api, type ArbOpportunity, type ArbStatus, type ArbStrategyConfig, type ArbTrade, type ArbWallet, type ExchangeId, type LogEntry } from "../api/client.js";
 import { useRefreshSignal } from "../hooks/useRefreshSignal.js";
 import { Panel } from "./Panel.js";
 import { Badge } from "./Badge.js";
 import { NetworkMapPanel } from "./NetworkMapPanel.js";
 import { ARB_BOT_HUB_LABEL, ARB_BOT_SERVICES, hintForDownProvider } from "./networkMapServices.js";
+import { ArbSpreadChartPanel } from "./PriceLineChartPanel.js";
+import { BotAnalyticsColumn, type PnlStats } from "./BotAnalyticsColumn.js";
+import { TradeFeedList, type TradeFeedRow } from "./TradeFeedList.js";
+import { SystemAlertsFeed } from "./SystemAlertsFeed.js";
+import { PortfolioExposureDonut } from "./PortfolioExposureDonut.js";
+import { logsToAlerts } from "../lib/alerts.js";
 
 const ALL_EXCHANGES: ExchangeId[] = ["binance", "bybit", "okx", "kucoin", "gateio", "mexc"];
+
+function arbPnlStats(trades: ArbTrade[]): PnlStats {
+  const wins = trades.filter((t) => Number(t.netProfitUsd) > 0);
+  const losses = trades.filter((t) => Number(t.netProfitUsd) < 0);
+  const totalVolumeUsd = trades.reduce((s, t) => s + Number(t.notionalUsd), 0);
+  const rois = trades.filter((t) => Number(t.notionalUsd) > 0).map((t) => (Number(t.netProfitUsd) / Number(t.notionalUsd)) * 100);
+  return {
+    closedTrades: trades.length,
+    wins: wins.length,
+    losses: losses.length,
+    winRate: trades.length > 0 ? (wins.length / trades.length) * 100 : null,
+    totalVolumeUsd,
+    avgRoiPct: rois.length > 0 ? rois.reduce((a, b) => a + b, 0) / rois.length : null,
+  };
+}
 
 export function ArbitragePanel() {
   const tick = useRefreshSignal();
@@ -15,6 +36,7 @@ export function ArbitragePanel() {
   const [config, setConfig] = useState<ArbStrategyConfig | null>(null);
   const [opportunities, setOpportunities] = useState<ArbOpportunity[]>([]);
   const [trades, setTrades] = useState<ArbTrade[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false);
@@ -27,6 +49,7 @@ export function ArbitragePanel() {
     api.arbConfig().then(setConfig).catch(() => {});
     api.arbOpportunities().then(setOpportunities).catch(() => {});
     api.arbTrades().then(setTrades).catch(() => {});
+    api.logs(200).then(setLogs).catch(() => {});
   }
 
   useEffect(refresh, [tick]);
@@ -169,7 +192,43 @@ export function ArbitragePanel() {
         </Panel>
       )}
 
-      <NetworkMapPanel title="Network Map — Exchanges" hubLabel={ARB_BOT_HUB_LABEL} services={ARB_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_1fr_300px]">
+        <BotAnalyticsColumn stats={arbPnlStats(trades)} />
+
+        <div className="space-y-4">
+          <ArbSpreadChartPanel />
+          <NetworkMapPanel title="Network Map — Exchanges" hubLabel={ARB_BOT_HUB_LABEL} services={ARB_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
+        </div>
+
+        <div className="space-y-4">
+          <TradeFeedList
+            trades={trades.slice(0, 20).map(
+              (t): TradeFeedRow => ({
+                id: t.id,
+                time: new Date(t.createdAt).toLocaleTimeString(),
+                venue: `${t.buyExchange}→${t.sellExchange}`.toUpperCase(),
+                side: "buy",
+                symbol: t.symbol,
+                amountUsd: Number(t.netProfitUsd),
+              }),
+            )}
+            title="Simulated Trade Feed"
+          />
+          <SystemAlertsFeed alerts={logsToAlerts(logs, "arb_")} />
+          <PortfolioExposureDonut
+            title="Volume by Symbol"
+            totalLabel="VOLUME"
+            slices={Object.entries(
+              trades.reduce<Record<string, number>>((acc, t) => {
+                acc[t.symbol] = (acc[t.symbol] ?? 0) + Number(t.notionalUsd);
+                return acc;
+              }, {}),
+            )
+              .map(([symbol, notionalUsd]) => ({ symbol, notionalUsd }))
+              .sort((a, b) => b.notionalUsd - a.notionalUsd)}
+          />
+        </div>
+      </div>
 
       <Panel
         title="Strategy Config"

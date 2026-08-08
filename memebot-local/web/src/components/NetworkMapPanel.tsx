@@ -28,20 +28,50 @@ const STATUS_COLOR: Record<Status, string> = {
 
 const REQUEST_COLOR = "#00E5FF"; // outbound "request sent" pulse — distinct from the status-colored response
 
-function curvePath(from: { x: number; y: number }, to: { x: number; y: number }): string {
+function curvePath(from: { x: number; y: number }, to: { x: number; y: number }, curveStrength = 34): string {
   const midX = (from.x + to.x) / 2;
   const midY = (from.y + to.y) / 2;
   // Perpendicular offset so the connector arcs instead of running straight.
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const len = Math.hypot(dx, dy) || 1;
-  const curveStrength = 28;
   const offsetX = (-dy / len) * curveStrength;
   const offsetY = (dx / len) * curveStrength;
   return `M${from.x},${from.y} Q${midX + offsetX},${midY + offsetY} ${to.x},${to.y}`;
 }
 
-const LOCAL = { x: 350, y: 230 };
+const VIEW_W = 800;
+const VIEW_H = 520;
+const LOCAL = { x: VIEW_W / 2, y: VIEW_H / 2 };
+
+/** Deterministic 0..1 hash of a string, used only for stable per-node
+ * radius/curve jitter so the fan-out looks organic instead of a perfect
+ * ring, without re-randomizing on every render. */
+function hash01(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return (h % 1000) / 1000;
+}
+
+/** Arranges every service node in a radial fan around the local hub —
+ * real provider count drives the angle spacing, so a 6-exchange map and an
+ * 11-provider map both read as a dense "spider web" radiating outward,
+ * matching the reference layout instead of the old fixed hand-placed grid. */
+function radialLayout(services: ServiceNode[]): Array<ServiceNode & { x: number; y: number; curve: number }> {
+  const n = services.length;
+  const baseRadius = Math.min(VIEW_W, VIEW_H * 1.7) * 0.4;
+  return services.map((s, i) => {
+    const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+    const jitter = hash01(s.id + i) * 46 - 23;
+    const r = baseRadius + jitter;
+    return {
+      ...s,
+      x: LOCAL.x + Math.cos(angle) * r,
+      y: LOCAL.y + Math.sin(angle) * r * 0.82,
+      curve: 22 + hash01(s.id) * 30,
+    };
+  });
+}
 
 export interface NetworkMapPanelProps {
   title?: string;
@@ -68,6 +98,7 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
   const pulseCounter = useRef(0);
   const particles = useParticleField(services.length);
   const mesh = useMemo(() => buildMesh(particles), [particles]);
+  const laidOut = useMemo(() => radialLayout(services), [services]);
 
   useEffect(() => {
     api
@@ -99,7 +130,15 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
   }, [relevantHealth]);
 
   return (
-    <Panel title={title} action={action}>
+    <Panel
+      title={title}
+      action={
+        <div className="flex items-center gap-3">
+          <Legend />
+          {action}
+        </div>
+      }
+    >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-white/40">
         <span>Real call graph + live provider health — node positions are illustrative, not geodata.</span>
         <span className="flex gap-3">
@@ -125,10 +164,17 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
         </p>
       )}
 
-      <svg viewBox="0 0 760 440" className="w-full">
+      <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full">
+        <defs>
+          <radialGradient id="hub-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#FF2D9B" stopOpacity={0.35} />
+            <stop offset="100%" stopColor="#FF2D9B" stopOpacity={0} />
+          </radialGradient>
+        </defs>
+
         <ParticleWeb particles={particles} mesh={mesh} />
 
-        {services.map((service) => {
+        {laidOut.map((service) => {
           const status = statusOf(health[service.id]);
           const active = !!pulses[service.id];
           return (
@@ -139,19 +185,23 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
               color={STATUS_COLOR[status]}
               active={active}
               pulseKey={pulses[service.id]}
+              curveStrength={service.curve}
             />
           );
         })}
 
-        {/* Local hub */}
-        <circle cx={LOCAL.x} cy={LOCAL.y} r={22} fill="#FF2D9B" fillOpacity={0.12} className="animate-node-idle" />
-        <circle cx={LOCAL.x} cy={LOCAL.y} r={16} fill="#FF2D9B" fillOpacity={0.18} />
-        <circle cx={LOCAL.x} cy={LOCAL.y} r={7} fill="#FF2D9B" style={{ filter: "drop-shadow(0 0 6px #FF2D9B)" }} />
-        <text x={LOCAL.x} y={LOCAL.y + 40} textAnchor="middle" className="fill-white/70" style={{ fontSize: 11, fontFamily: "monospace" }}>
+        {/* Local hub — layered glow + rotating dashed ring, the visual
+            centerpiece every connection radiates from/to. */}
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={70} fill="url(#hub-glow)" />
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={38} fill="none" stroke="#FF2D9B" strokeOpacity={0.35} strokeDasharray="3 5" className="animate-radar-spin" style={{ transformOrigin: `${LOCAL.x}px ${LOCAL.y}px` }} />
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={26} fill="#FF2D9B" fillOpacity={0.14} className="animate-node-idle" />
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={17} fill="#FF2D9B" fillOpacity={0.22} />
+        <circle cx={LOCAL.x} cy={LOCAL.y} r={9} fill="#FF2D9B" style={{ filter: "drop-shadow(0 0 10px #FF2D9B)" }} />
+        <text x={LOCAL.x} y={LOCAL.y + 52} textAnchor="middle" className="fill-white/80" style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, letterSpacing: 1 }}>
           {hubLabel}
         </text>
 
-        {services.map((service) => {
+        {laidOut.map((service) => {
           const h = health[service.id];
           const status = statusOf(h);
           const color = STATUS_COLOR[status];
@@ -191,14 +241,16 @@ function ConnectionLine({
   color,
   active,
   pulseKey,
+  curveStrength,
 }: {
   from: { x: number; y: number };
   to: { x: number; y: number };
   color: string;
   active: boolean;
   pulseKey: number | undefined;
+  curveStrength?: number;
 }) {
-  const d = curvePath(from, to);
+  const d = curvePath(from, to, curveStrength);
   return (
     <>
       <path d={d} fill="none" stroke={active ? color : "rgba(255,255,255,0.08)"} strokeWidth={active ? 1.75 : 1} />
@@ -213,6 +265,24 @@ function ConnectionLine({
         </g>
       )}
     </>
+  );
+}
+
+function Legend() {
+  const items: Array<[string, string]> = [
+    ["#00E5FF", "REQUEST"],
+    ["#00FFC8", "RESPONSE"],
+    ["#FF3B5C", "ERROR"],
+  ];
+  return (
+    <div className="hidden items-center gap-3 font-mono text-[9px] uppercase tracking-wide text-white/40 sm:flex">
+      {items.map(([color, label]) => (
+        <span key={label} className="flex items-center gap-1">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: color, boxShadow: `0 0 4px ${color}` }} />
+          {label}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -240,12 +310,12 @@ const PARTICLE_PALETTE = ["#00FFC8", "#00FFC8", "#00FFC8", "#00E5FF", "#FF2D9B",
  * instead of smooth motion). */
 function useParticleField(serviceCount: number): Particle[] {
   return useMemo(() => {
-    const count = Math.min(140, 60 + serviceCount * 8);
+    const count = Math.min(160, 70 + serviceCount * 9);
     const particles: Particle[] = [];
     for (let i = 0; i < count; i++) {
       particles.push({
-        x: 15 + Math.random() * 730,
-        y: 15 + Math.random() * 410,
+        x: 15 + Math.random() * (VIEW_W - 30),
+        y: 15 + Math.random() * (VIEW_H - 30),
         r: 0.5 + Math.random() * 1.3,
         color: PARTICLE_PALETTE[Math.floor(Math.random() * PARTICLE_PALETTE.length)]!,
         opacity: 0.12 + Math.random() * 0.3,

@@ -1,11 +1,33 @@
 import { useEffect, useState } from "react";
-import { api, type FuturesPosition, type FuturesSignal, type FuturesStatus, type FuturesStrategyConfig, type FuturesTrade, type FuturesWallet } from "../api/client.js";
+import { api, type FuturesPosition, type FuturesSignal, type FuturesStatus, type FuturesStrategyConfig, type FuturesTrade, type FuturesWallet, type LogEntry } from "../api/client.js";
 import { useRefreshSignal } from "../hooks/useRefreshSignal.js";
 import { Panel } from "./Panel.js";
 import { Badge } from "./Badge.js";
 import { BybitWalletCard } from "./BybitWalletCard.js";
 import { NetworkMapPanel } from "./NetworkMapPanel.js";
 import { ALL_BOT_SERVICES, ALL_BOTS_HUB_LABEL, hintForDownProvider } from "./networkMapServices.js";
+import { MarketChartPanel } from "./MarketChartPanel.js";
+import { BotAnalyticsColumn, type PnlStats } from "./BotAnalyticsColumn.js";
+import { TradeFeedList, type TradeFeedRow } from "./TradeFeedList.js";
+import { SystemAlertsFeed } from "./SystemAlertsFeed.js";
+import { PortfolioExposureDonut } from "./PortfolioExposureDonut.js";
+import { logsToAlerts } from "../lib/alerts.js";
+
+function futuresPnlStats(positions: FuturesPosition[]): PnlStats {
+  const closed = positions.filter((p) => p.status === "closed");
+  const wins = closed.filter((p) => Number(p.realizedPnlUsd) > 0);
+  const losses = closed.filter((p) => Number(p.realizedPnlUsd) < 0);
+  const totalVolumeUsd = positions.reduce((s, p) => s + Number(p.notionalUsd), 0);
+  const rois = closed.filter((p) => Number(p.marginUsd) > 0).map((p) => (Number(p.realizedPnlUsd) / Number(p.marginUsd)) * 100);
+  return {
+    closedTrades: closed.length,
+    wins: wins.length,
+    losses: losses.length,
+    winRate: closed.length > 0 ? (wins.length / closed.length) * 100 : null,
+    totalVolumeUsd,
+    avgRoiPct: rois.length > 0 ? rois.reduce((a, b) => a + b, 0) / rois.length : null,
+  };
+}
 
 export function FuturesPanel() {
   const tick = useRefreshSignal();
@@ -15,6 +37,7 @@ export function FuturesPanel() {
   const [signals, setSignals] = useState<FuturesSignal[]>([]);
   const [positions, setPositions] = useState<FuturesPosition[]>([]);
   const [trades, setTrades] = useState<FuturesTrade[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showModeConfirm, setShowModeConfirm] = useState(false);
@@ -28,6 +51,7 @@ export function FuturesPanel() {
     api.futuresSignals().then(setSignals).catch(() => {});
     api.futuresPositions().then(setPositions).catch(() => {});
     api.futuresTrades().then(setTrades).catch(() => {});
+    api.logs(200).then(setLogs).catch(() => {});
   }
 
   useEffect(refresh, [tick]);
@@ -219,7 +243,32 @@ export function FuturesPanel() {
 
       <BybitWalletCard botLabel="Bybit Futures" wallet={wallet} />
 
-      <NetworkMapPanel title="Network Map — All Bots" hubLabel={ALL_BOTS_HUB_LABEL} services={ALL_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_1fr_300px]">
+        <BotAnalyticsColumn stats={futuresPnlStats(positions)} />
+
+        <div className="space-y-4">
+          <MarketChartPanel kind="futures" />
+          <NetworkMapPanel title="Network Map — All Bots" hubLabel={ALL_BOTS_HUB_LABEL} services={ALL_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
+        </div>
+
+        <div className="space-y-4">
+          <TradeFeedList
+            trades={trades.slice(0, 20).map(
+              (t): TradeFeedRow => ({
+                id: t.id,
+                time: new Date(t.created_at).toLocaleTimeString(),
+                venue: "BYBIT",
+                side: t.side.startsWith("open") ? "buy" : "sell",
+                symbol: t.symbol,
+                amountUsd: Number(t.qty) * Number(t.price_usd),
+                failed: t.status === "failed",
+              }),
+            )}
+          />
+          <SystemAlertsFeed alerts={logsToAlerts(logs, "futures_")} />
+          <PortfolioExposureDonut slices={openPositions.map((p) => ({ symbol: p.symbol, notionalUsd: Number(p.marginUsd) }))} totalLabel="MARGIN" />
+        </div>
+      </div>
 
       <Panel
         title="Strategy Config"

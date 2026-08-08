@@ -3,11 +3,21 @@ import { z } from "zod";
 import { futuresLiveTradingAllowedByConfig } from "../env.js";
 import { isBybitConfigured, type BybitMode } from "../bybit/client.js";
 import { getWalletBalance } from "../bybit/trading.js";
+import { getKlines, getOrderbook, getTicker } from "../bybit/marketData.js";
 import { getFuturesStrategyConfig, updateFuturesStrategyConfig } from "../futures/configStore.js";
 import { manualCloseFuturesPosition, requestFuturesModeChange, startFuturesBot, stopFuturesBot } from "../futures/controller.js";
 import { listFuturesPositions, listFuturesTrades, listSignals } from "../futures/repository.js";
 import { FuturesStrategyConfigObjectSchema } from "../futures/schema.js";
 import { getFuturesBotState, resumeFuturesFromEmergencyStop, triggerFuturesEmergencyStop } from "../futures/state.js";
+
+/** Same symbol the market-chart panel on the dashboard's Live tab should
+ * show: the bot's own open position when it has one (real, currently
+ * traded), otherwise BTCUSDT — always-liquid on Bybit, so the chart has
+ * real data to show even while idle rather than going blank. */
+function defaultChartSymbol(): string {
+  const open = listFuturesPositions().find((p) => p.status === "open");
+  return open?.symbol ?? "BTCUSDT";
+}
 
 const ModeBodySchema = z.object({ mode: z.enum(["testnet", "live"]), confirmed: z.boolean().default(false) });
 const EmergencyStopBodySchema = z.object({ reason: z.string().min(1).max(500) });
@@ -107,4 +117,40 @@ export default async function futuresRoutes(app: FastifyInstance) {
   });
 
   app.get("/futures/trades", async () => listFuturesTrades(200));
+
+  app.get("/futures/candles", async (request, reply) => {
+    const q = request.query as Record<string, string>;
+    const symbol = q.symbol || defaultChartSymbol();
+    const mode = (q.mode as BybitMode) ?? getFuturesBotState().mode;
+    try {
+      const candles = await getKlines(symbol, 5, 120, mode, "linear");
+      return { symbol, mode, candles };
+    } catch (err) {
+      return reply.code(502).send({ error: "bybit_error", message: (err as Error).message });
+    }
+  });
+
+  app.get("/futures/orderbook", async (request, reply) => {
+    const q = request.query as Record<string, string>;
+    const symbol = q.symbol || defaultChartSymbol();
+    const mode = (q.mode as BybitMode) ?? getFuturesBotState().mode;
+    try {
+      const book = await getOrderbook(symbol, 12, mode, "linear");
+      return { symbol, mode, ...book };
+    } catch (err) {
+      return reply.code(502).send({ error: "bybit_error", message: (err as Error).message });
+    }
+  });
+
+  app.get("/futures/ticker", async (request, reply) => {
+    const q = request.query as Record<string, string>;
+    const symbol = q.symbol || defaultChartSymbol();
+    const mode = (q.mode as BybitMode) ?? getFuturesBotState().mode;
+    try {
+      const ticker = await getTicker(symbol, mode, "linear");
+      return { symbol, mode, ticker };
+    } catch (err) {
+      return reply.code(502).send({ error: "bybit_error", message: (err as Error).message });
+    }
+  });
 }

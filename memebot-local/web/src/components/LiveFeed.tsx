@@ -9,6 +9,28 @@ import { DecisionEnginePanel } from "./DecisionEnginePanel.js";
 import { TokenCardsRow } from "./TokenCardsRow.js";
 import { NetworkMapPanel } from "./NetworkMapPanel.js";
 import { ALL_BOT_SERVICES, ALL_BOTS_HUB_LABEL, hintForDownProvider } from "./networkMapServices.js";
+import { MemeTokenChartPanel } from "./PriceLineChartPanel.js";
+import { BotAnalyticsColumn, type PnlStats } from "./BotAnalyticsColumn.js";
+import { TradeFeedList, type TradeFeedRow } from "./TradeFeedList.js";
+import { SystemAlertsFeed } from "./SystemAlertsFeed.js";
+import { PortfolioExposureDonut } from "./PortfolioExposureDonut.js";
+import { memeLogsToAlerts } from "../lib/alerts.js";
+
+function memePnlStats(positions: Position[]): PnlStats {
+  const closed = positions.filter((p) => p.status === "closed");
+  const wins = closed.filter((p) => Number(p.realizedPnlUsd) > 0);
+  const losses = closed.filter((p) => Number(p.realizedPnlUsd) < 0);
+  const totalVolumeUsd = positions.reduce((s, p) => s + Number(p.costBasisUsd), 0);
+  const rois = closed.filter((p) => Number(p.costBasisUsd) > 0).map((p) => (Number(p.realizedPnlUsd) / Number(p.costBasisUsd)) * 100);
+  return {
+    closedTrades: closed.length,
+    wins: wins.length,
+    losses: losses.length,
+    winRate: closed.length > 0 ? (wins.length / closed.length) * 100 : null,
+    totalVolumeUsd,
+    avgRoiPct: rois.length > 0 ? rois.reduce((a, b) => a + b, 0) / rois.length : null,
+  };
+}
 
 type FlashKind = "scan" | "buy" | "sell";
 interface Flash {
@@ -45,7 +67,7 @@ const CATEGORY_TAG: Record<string, string> = {
 export function LiveFeed({ running, mode }: { running: boolean; mode: "paper" | "live" }) {
   const tick = useRefreshSignal();
   const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
-  const [openPositions, setOpenPositions] = useState<Position[]>([]);
+  const [allPositions, setAllPositions] = useState<Position[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [flashes, setFlashes] = useState<Record<string, Flash>>({});
@@ -54,8 +76,10 @@ export function LiveFeed({ running, mode }: { running: boolean; mode: "paper" | 
 
   useEffect(() => {
     api.watchlist().then(setWatchlist).catch(() => {});
-    api.listPositions().then((all) => setOpenPositions(all.filter((p) => p.status === "open"))).catch(() => {});
+    api.listPositions().then(setAllPositions).catch(() => {});
   }, [tick]);
+
+  const openPositions = useMemo(() => allPositions.filter((p) => p.status === "open"), [allPositions]);
 
   useEffect(() => {
     api.logs(MAX_LOG_LINES).then((l) => setLogs(l.slice().reverse())).catch(() => {});
@@ -112,21 +136,48 @@ export function LiveFeed({ running, mode }: { running: boolean; mode: "paper" | 
     <div className="space-y-4">
       <SystemMonitorBar />
 
-      <NetworkMapPanel
-        title="Network Map — All Bots"
-        hubLabel={ALL_BOTS_HUB_LABEL}
-        services={ALL_BOT_SERVICES}
-        hintForDownProvider={(id) => hintForDownProvider(id)}
-        action={
-          <button
-            onClick={() => api.discoverTokens().catch(() => {})}
-            className="rounded border border-white/15 px-2 py-1 text-[10px] font-mono text-white/50 hover:bg-white/10"
-            title="Runs a real discovery pass now, same as the Scanner tab's Discover Now button"
-          >
-            DISCOVER NOW
-          </button>
-        }
-      />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_1fr_300px]">
+        <BotAnalyticsColumn stats={memePnlStats(allPositions)} />
+
+        <div className="space-y-4">
+          <MemeTokenChartPanel />
+          <NetworkMapPanel
+            title="Network Map — All Bots"
+            hubLabel={ALL_BOTS_HUB_LABEL}
+            services={ALL_BOT_SERVICES}
+            hintForDownProvider={(id) => hintForDownProvider(id)}
+            action={
+              <button
+                onClick={() => api.discoverTokens().catch(() => {})}
+                className="rounded border border-white/15 px-2 py-1 text-[10px] font-mono text-white/50 hover:bg-white/10"
+                title="Runs a real discovery pass now, same as the Scanner tab's Discover Now button"
+              >
+                DISCOVER NOW
+              </button>
+            }
+          />
+        </div>
+
+        <div className="space-y-4">
+          <TradeFeedList
+            trades={trades.slice(0, 20).map(
+              (t): TradeFeedRow => ({
+                id: t.id,
+                time: new Date(t.created_at).toLocaleTimeString(),
+                venue: mode === "live" ? "SOLANA" : "PAPER",
+                side: t.side === "buy" ? "buy" : "sell",
+                symbol: t.symbol ?? t.mint.slice(0, 6),
+                amountUsd: Number(t.amount_usd),
+                failed: t.status === "failed",
+              }),
+            )}
+          />
+          <SystemAlertsFeed alerts={memeLogsToAlerts(logs)} />
+          <PortfolioExposureDonut
+            slices={openPositions.map((p) => ({ symbol: p.symbol ?? p.mint.slice(0, 6), notionalUsd: Number(p.costBasisUsd) }))}
+          />
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
         <RadarPanel nodes={radarNodes} openMints={openMints} flashes={flashes} running={running} />

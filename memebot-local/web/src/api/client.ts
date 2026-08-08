@@ -288,6 +288,9 @@ export const api = {
   spotPositions: (mode?: BybitMode) => get<SpotPosition[]>(`/spot/positions${mode ? `?mode=${mode}` : ""}`),
   spotTrades: () => get<SpotTrade[]>("/spot/trades"),
   closeSpotPosition: (id: string) => post(`/spot/positions/${id}/close`),
+  spotCandles: (symbol?: string) => get<CandlesResponse>(`/spot/candles${symbol ? `?symbol=${symbol}` : ""}`),
+  spotOrderbook: (symbol?: string) => get<OrderbookResponse>(`/spot/orderbook${symbol ? `?symbol=${symbol}` : ""}`),
+  spotTicker: (symbol?: string) => get<TickerResponse>(`/spot/ticker${symbol ? `?symbol=${symbol}` : ""}`),
 
   futuresStatus: () => get<FuturesStatus>("/futures/status"),
   futuresWallet: (mode?: BybitMode) => get<FuturesWallet>(`/futures/wallet${mode ? `?mode=${mode}` : ""}`),
@@ -302,6 +305,9 @@ export const api = {
   futuresPositions: (mode?: BybitMode) => get<FuturesPosition[]>(`/futures/positions${mode ? `?mode=${mode}` : ""}`),
   futuresTrades: () => get<FuturesTrade[]>("/futures/trades"),
   closeFuturesPosition: (id: string) => post(`/futures/positions/${id}/close`),
+  futuresCandles: (symbol?: string) => get<CandlesResponse>(`/futures/candles${symbol ? `?symbol=${symbol}` : ""}`),
+  futuresOrderbook: (symbol?: string) => get<OrderbookResponse>(`/futures/orderbook${symbol ? `?symbol=${symbol}` : ""}`),
+  futuresTicker: (symbol?: string) => get<TickerResponse>(`/futures/ticker${symbol ? `?symbol=${symbol}` : ""}`),
 
   arbStatus: () => get<ArbStatus>("/arb/status"),
   arbWallet: () => get<ArbWallet>("/arb/wallet"),
@@ -693,6 +699,54 @@ export interface SystemStats {
 export interface EquityPoint {
   t: string;
   balance: number;
+}
+
+export interface Candle {
+  startTime: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  turnover: number;
+}
+
+export interface CandlesResponse {
+  symbol: string;
+  mode: BybitMode;
+  candles: Candle[];
+}
+
+export interface OrderbookLevel {
+  price: number;
+  size: number;
+}
+
+export interface OrderbookResponse {
+  symbol: string;
+  mode: BybitMode;
+  bids: OrderbookLevel[];
+  asks: OrderbookLevel[];
+}
+
+export interface TickerSnapshot {
+  symbol: string;
+  lastPrice: number;
+  volume24h: number;
+  turnover24h: number;
+  price24hPct: number;
+  openInterest: number;
+  fundingRate: number;
+  bid1Price: number;
+  bid1Size: number;
+  ask1Price: number;
+  ask1Size: number;
+}
+
+export interface TickerResponse {
+  symbol: string;
+  mode: BybitMode;
+  ticker: TickerSnapshot | null;
 }
 
 export interface PricePoint {

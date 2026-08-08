@@ -1,11 +1,33 @@
 import { useEffect, useState } from "react";
-import { api, type SpotPosition, type SpotSignal, type SpotStatus, type SpotStrategyConfig, type SpotTrade, type SpotWallet } from "../api/client.js";
+import { api, type LogEntry, type SpotPosition, type SpotSignal, type SpotStatus, type SpotStrategyConfig, type SpotTrade, type SpotWallet } from "../api/client.js";
 import { useRefreshSignal } from "../hooks/useRefreshSignal.js";
 import { Panel } from "./Panel.js";
 import { Badge } from "./Badge.js";
 import { BybitWalletCard } from "./BybitWalletCard.js";
 import { NetworkMapPanel } from "./NetworkMapPanel.js";
 import { ALL_BOT_SERVICES, ALL_BOTS_HUB_LABEL, hintForDownProvider } from "./networkMapServices.js";
+import { MarketChartPanel } from "./MarketChartPanel.js";
+import { BotAnalyticsColumn, type PnlStats } from "./BotAnalyticsColumn.js";
+import { TradeFeedList, type TradeFeedRow } from "./TradeFeedList.js";
+import { SystemAlertsFeed } from "./SystemAlertsFeed.js";
+import { PortfolioExposureDonut } from "./PortfolioExposureDonut.js";
+import { logsToAlerts } from "../lib/alerts.js";
+
+function spotPnlStats(positions: SpotPosition[]): PnlStats {
+  const closed = positions.filter((p) => p.status === "closed");
+  const wins = closed.filter((p) => Number(p.realizedPnlUsd) > 0);
+  const losses = closed.filter((p) => Number(p.realizedPnlUsd) < 0);
+  const totalVolumeUsd = positions.reduce((s, p) => s + Number(p.notionalUsd), 0);
+  const rois = closed.filter((p) => Number(p.notionalUsd) > 0).map((p) => (Number(p.realizedPnlUsd) / Number(p.notionalUsd)) * 100);
+  return {
+    closedTrades: closed.length,
+    wins: wins.length,
+    losses: losses.length,
+    winRate: closed.length > 0 ? (wins.length / closed.length) * 100 : null,
+    totalVolumeUsd,
+    avgRoiPct: rois.length > 0 ? rois.reduce((a, b) => a + b, 0) / rois.length : null,
+  };
+}
 
 export function SpotPanel() {
   const tick = useRefreshSignal();
@@ -15,6 +37,7 @@ export function SpotPanel() {
   const [signals, setSignals] = useState<SpotSignal[]>([]);
   const [positions, setPositions] = useState<SpotPosition[]>([]);
   const [trades, setTrades] = useState<SpotTrade[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showModeConfirm, setShowModeConfirm] = useState(false);
@@ -28,6 +51,7 @@ export function SpotPanel() {
     api.spotSignals().then(setSignals).catch(() => {});
     api.spotPositions().then(setPositions).catch(() => {});
     api.spotTrades().then(setTrades).catch(() => {});
+    api.logs(200).then(setLogs).catch(() => {});
   }
 
   useEffect(refresh, [tick]);
@@ -211,7 +235,32 @@ export function SpotPanel() {
 
       <BybitWalletCard botLabel="Bybit Spot" wallet={wallet} />
 
-      <NetworkMapPanel title="Network Map — All Bots" hubLabel={ALL_BOTS_HUB_LABEL} services={ALL_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_1fr_300px]">
+        <BotAnalyticsColumn stats={spotPnlStats(positions)} />
+
+        <div className="space-y-4">
+          <MarketChartPanel kind="spot" />
+          <NetworkMapPanel title="Network Map — All Bots" hubLabel={ALL_BOTS_HUB_LABEL} services={ALL_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
+        </div>
+
+        <div className="space-y-4">
+          <TradeFeedList
+            trades={trades.slice(0, 20).map(
+              (t): TradeFeedRow => ({
+                id: t.id,
+                time: new Date(t.created_at).toLocaleTimeString(),
+                venue: "BYBIT",
+                side: t.side === "buy" ? "buy" : "sell",
+                symbol: t.symbol,
+                amountUsd: Number(t.qty) * Number(t.price_usd),
+                failed: t.status === "failed",
+              }),
+            )}
+          />
+          <SystemAlertsFeed alerts={logsToAlerts(logs, "spot_")} />
+          <PortfolioExposureDonut slices={openPositions.map((p) => ({ symbol: p.symbol, notionalUsd: Number(p.notionalUsd) }))} />
+        </div>
+      </div>
 
       <Panel
         title="Strategy Config"
