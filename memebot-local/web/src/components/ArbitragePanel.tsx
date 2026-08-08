@@ -194,11 +194,7 @@ export function ArbitragePanel() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_1fr_300px]">
         <BotAnalyticsColumn stats={arbPnlStats(trades)} />
-
-        <div className="space-y-4">
-          <ArbSpreadChartPanel />
-          <NetworkMapPanel title="Network Map — Exchanges" hubLabel={ARB_BOT_HUB_LABEL} services={ARB_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
-        </div>
+        <ArbSpreadChartPanel />
 
         <div className="space-y-4">
           <TradeFeedList
@@ -229,6 +225,8 @@ export function ArbitragePanel() {
           />
         </div>
       </div>
+
+      <NetworkMapPanel title="Network Map — Exchanges" hubLabel={ARB_BOT_HUB_LABEL} services={ARB_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
 
       <Panel
         title="Strategy Config"

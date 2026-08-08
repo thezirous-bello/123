@@ -237,11 +237,7 @@ export function SpotPanel() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_1fr_300px]">
         <BotAnalyticsColumn stats={spotPnlStats(positions)} />
-
-        <div className="space-y-4">
-          <MarketChartPanel kind="spot" />
-          <NetworkMapPanel title="Network Map — All Bots" hubLabel={ALL_BOTS_HUB_LABEL} services={ALL_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
-        </div>
+        <MarketChartPanel kind="spot" />
 
         <div className="space-y-4">
           <TradeFeedList
@@ -261,6 +257,8 @@ export function SpotPanel() {
           <PortfolioExposureDonut slices={openPositions.map((p) => ({ symbol: p.symbol, notionalUsd: Number(p.notionalUsd) }))} />
         </div>
       </div>
+
+      <NetworkMapPanel title="Network Map — All Bots" hubLabel={ALL_BOTS_HUB_LABEL} services={ALL_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
 
       <Panel
         title="Strategy Config"

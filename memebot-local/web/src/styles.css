@@ -189,6 +189,21 @@ body {
   animation-delay: var(--delay, 0s);
 }
 
+/* Fires for ~900ms every time a real provider call completes (see
+ * NetworkMapPanel's `boosted` state) — the ambient web behind the nodes
+ * visibly speeds up and brightens in response to real activity instead of
+ * drifting at a constant rate all the time. !important is required here:
+ * it's the only way an external stylesheet rule can override the inline
+ * --dur/opacity custom properties React sets per particle. */
+.network-boost .particle-dot {
+  animation-duration: 700ms !important;
+  opacity: calc(var(--p-op, 0.4) * 2.2) !important;
+}
+.network-boost .mesh-line {
+  stroke-opacity: 0.16 !important;
+  transition: stroke-opacity 150ms ease-out;
+}
+
 .text-glow-green {
   text-shadow: 0 0 6px rgba(0, 255, 200, 0.65);
 }

@@ -138,25 +138,7 @@ export function LiveFeed({ running, mode }: { running: boolean; mode: "paper" | 
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_1fr_300px]">
         <BotAnalyticsColumn stats={memePnlStats(allPositions)} />
-
-        <div className="space-y-4">
-          <MemeTokenChartPanel />
-          <NetworkMapPanel
-            title="Network Map — All Bots"
-            hubLabel={ALL_BOTS_HUB_LABEL}
-            services={ALL_BOT_SERVICES}
-            hintForDownProvider={(id) => hintForDownProvider(id)}
-            action={
-              <button
-                onClick={() => api.discoverTokens().catch(() => {})}
-                className="rounded border border-white/15 px-2 py-1 text-[10px] font-mono text-white/50 hover:bg-white/10"
-                title="Runs a real discovery pass now, same as the Scanner tab's Discover Now button"
-              >
-                DISCOVER NOW
-              </button>
-            }
-          />
-        </div>
+        <MemeTokenChartPanel />
 
         <div className="space-y-4">
           <TradeFeedList
@@ -178,6 +160,22 @@ export function LiveFeed({ running, mode }: { running: boolean; mode: "paper" | 
           />
         </div>
       </div>
+
+      <NetworkMapPanel
+        title="Network Map — All Bots"
+        hubLabel={ALL_BOTS_HUB_LABEL}
+        services={ALL_BOT_SERVICES}
+        hintForDownProvider={(id) => hintForDownProvider(id)}
+        action={
+          <button
+            onClick={() => api.discoverTokens().catch(() => {})}
+            className="rounded border border-white/15 px-2 py-1 text-[10px] font-mono text-white/50 hover:bg-white/10"
+            title="Runs a real discovery pass now, same as the Scanner tab's Discover Now button"
+          >
+            DISCOVER NOW
+          </button>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
         <RadarPanel nodes={radarNodes} openMints={openMints} flashes={flashes} running={running} />

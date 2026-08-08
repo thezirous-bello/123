@@ -40,8 +40,8 @@ function curvePath(from: { x: number; y: number }, to: { x: number; y: number },
   return `M${from.x},${from.y} Q${midX + offsetX},${midY + offsetY} ${to.x},${to.y}`;
 }
 
-const VIEW_W = 800;
-const VIEW_H = 520;
+const VIEW_W = 1040;
+const VIEW_H = 680;
 const LOCAL = { x: VIEW_W / 2, y: VIEW_H / 2 };
 
 /** Deterministic 0..1 hash of a string, used only for stable per-node
@@ -95,7 +95,9 @@ export interface NetworkMapPanelProps {
 export function NetworkMapPanel({ title = "Network Map", hubLabel, services, action, hintForDownProvider }: NetworkMapPanelProps) {
   const [health, setHealth] = useState<Record<string, ProviderHealth>>({});
   const [pulses, setPulses] = useState<Record<string, number>>({});
+  const [boosted, setBoosted] = useState(false);
   const pulseCounter = useRef(0);
+  const boostTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const particles = useParticleField(services.length);
   const mesh = useMemo(() => buildMesh(particles), [particles]);
   const laidOut = useMemo(() => radialLayout(services), [services]);
@@ -115,6 +117,14 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
     setTimeout(() => {
       setPulses((prev) => (prev[entry.provider] === key ? { ...prev, [entry.provider]: 0 } : prev));
     }, 1100);
+
+    // Real activity ripples through the whole ambient web behind the
+    // nodes, not just the one connection line that fired — every call
+    // in/out visibly speeds up and brightens the background mesh for a
+    // moment instead of it drifting at the same constant rate always.
+    setBoosted(true);
+    if (boostTimer.current) clearTimeout(boostTimer.current);
+    boostTimer.current = setTimeout(() => setBoosted(false), 900);
   });
 
   const relevantHealth = useMemo(() => {
@@ -172,7 +182,7 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
           </radialGradient>
         </defs>
 
-        <ParticleWeb particles={particles} mesh={mesh} />
+        <ParticleWeb particles={particles} mesh={mesh} boosted={boosted} />
 
         {laidOut.map((service) => {
           const status = statusOf(health[service.id]);
@@ -310,7 +320,7 @@ const PARTICLE_PALETTE = ["#00FFC8", "#00FFC8", "#00FFC8", "#00E5FF", "#FF2D9B",
  * instead of smooth motion). */
 function useParticleField(serviceCount: number): Particle[] {
   return useMemo(() => {
-    const count = Math.min(160, 70 + serviceCount * 9);
+    const count = Math.min(260, 120 + serviceCount * 14);
     const particles: Particle[] = [];
     for (let i = 0; i < count; i++) {
       particles.push({
@@ -334,8 +344,8 @@ function useParticleField(serviceCount: number): Particle[] {
  * de-duplicated — the faint "spider web" mesh texture behind the real
  * nodes. Computed once alongside the particle field itself. */
 function buildMesh(particles: Particle[]): Array<[Particle, Particle]> {
-  const maxDist = 65;
-  const maxLinksPerNode = 2;
+  const maxDist = 85;
+  const maxLinksPerNode = 3;
   const seen = new Set<string>();
   const lines: Array<[Particle, Particle]> = [];
   for (let i = 0; i < particles.length; i++) {
@@ -354,12 +364,12 @@ function buildMesh(particles: Particle[]): Array<[Particle, Particle]> {
   return lines;
 }
 
-function ParticleWeb({ particles, mesh }: { particles: Particle[]; mesh: Array<[Particle, Particle]> }) {
+function ParticleWeb({ particles, mesh, boosted }: { particles: Particle[]; mesh: Array<[Particle, Particle]>; boosted: boolean }) {
   return (
-    <g>
+    <g className={boosted ? "network-boost" : undefined}>
       <g>
         {mesh.map(([a, b], i) => (
-          <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#ffffff" strokeOpacity={0.055} strokeWidth={0.6} />
+          <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="mesh-line" stroke="#ffffff" strokeOpacity={0.055} strokeWidth={0.6} />
         ))}
       </g>
       <g>
@@ -370,7 +380,7 @@ function ParticleWeb({ particles, mesh }: { particles: Particle[]; mesh: Array<[
             cy={p.y}
             r={p.r}
             fill={p.color}
-            className="animate-particle-drift"
+            className="particle-dot animate-particle-drift"
             style={
               {
                 "--p-op": p.opacity,
