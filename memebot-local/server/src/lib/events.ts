@@ -15,7 +15,10 @@ export type BotEventName =
   | "futures_state_changed"
   | "futures_signal_changed"
   | "futures_position_changed"
-  | "futures_trade_created";
+  | "futures_trade_created"
+  | "arb_state_changed"
+  | "arb_opportunity_created"
+  | "arb_trade_created";
 
 class BotEventBus extends EventEmitter {
   emitEvent(name: BotEventName, payload: unknown) {

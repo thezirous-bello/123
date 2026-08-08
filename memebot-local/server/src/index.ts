@@ -11,6 +11,7 @@ import { isWalletConfigured } from "./wallet/walletManager.js";
 import { stopBot } from "./engine/botController.js";
 import { stopSpotBot } from "./spot/controller.js";
 import { stopFuturesBot } from "./futures/controller.js";
+import { stopArbBot } from "./arb/controller.js";
 import { recordHttpTraffic, startSystemStatsSampler } from "./lib/systemStats.js";
 
 import statusRoutes from "./routes/status.js";
@@ -28,6 +29,7 @@ import analyticsRoutes from "./routes/analytics.js";
 import providerRoutes from "./routes/providers.js";
 import spotRoutes from "./routes/spot.js";
 import futuresRoutes from "./routes/futures.js";
+import arbRoutes from "./routes/arb.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isProd = process.env.NODE_ENV === "production";
@@ -65,6 +67,7 @@ await app.register(analyticsRoutes, { prefix: "/api" });
 await app.register(providerRoutes, { prefix: "/api" });
 await app.register(spotRoutes, { prefix: "/api" });
 await app.register(futuresRoutes, { prefix: "/api" });
+await app.register(arbRoutes, { prefix: "/api" });
 
 startSystemStatsSampler();
 
@@ -105,6 +108,7 @@ async function shutdown() {
   stopBot();
   stopSpotBot();
   stopFuturesBot();
+  stopArbBot();
   await app.close();
   process.exit(0);
 }

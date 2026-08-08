@@ -13,15 +13,18 @@ import { LogsPanel } from "./components/LogsPanel.js";
 import { LiveFeed } from "./components/LiveFeed.js";
 import { SpotPanel } from "./components/SpotPanel.js";
 import { FuturesPanel } from "./components/FuturesPanel.js";
+import { ArbitragePanel } from "./components/ArbitragePanel.js";
+import { AllBotsBalances } from "./components/AllBotsBalances.js";
 
 const TABS = ["Dashboard", "Live", "Strategy", "Scanner", "Positions", "History", "Risk", "Logs"] as const;
 type Tab = (typeof TABS)[number];
-type BotKind = "meme" | "spot" | "futures";
+type BotKind = "meme" | "spot" | "futures" | "arb";
 
 const BOT_KIND_LABELS: Record<BotKind, string> = {
   meme: "Meme Coins (Solana)",
   spot: "Bybit Spot",
   futures: "Bybit Futures",
+  arb: "Arbitrage",
 };
 
 export default function App() {
@@ -64,6 +67,9 @@ export default function App() {
 
       {tab === "Dashboard" && status && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="lg:col-span-2">
+            <AllBotsBalances />
+          </div>
           <WalletCard mode={status.mode} />
           <PnLSummary mode={status.mode} />
           <div className="lg:col-span-2">
@@ -75,7 +81,7 @@ export default function App() {
       {tab === "Live" && (
         <div className="space-y-4">
           <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1 w-fit">
-            {(["meme", "spot", "futures"] as const).map((kind) => (
+            {(["meme", "spot", "futures", "arb"] as const).map((kind) => (
               <button
                 key={kind}
                 onClick={() => setBotKind(kind)}
@@ -90,6 +96,7 @@ export default function App() {
           {botKind === "meme" && <LiveFeed running={status?.running ?? false} mode={status?.mode ?? "paper"} />}
           {botKind === "spot" && <SpotPanel />}
           {botKind === "futures" && <FuturesPanel />}
+          {botKind === "arb" && <ArbitragePanel />}
         </div>
       )}
       {tab === "Strategy" && <StrategyPanel />}

@@ -20,6 +20,9 @@ export const BOT_EVENT_NAMES = [
   "futures_signal_changed",
   "futures_position_changed",
   "futures_trade_created",
+  "arb_state_changed",
+  "arb_opportunity_created",
+  "arb_trade_created",
 ] as const;
 export type BotEventName = (typeof BOT_EVENT_NAMES)[number];
 

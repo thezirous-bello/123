@@ -357,3 +357,68 @@ CREATE TABLE IF NOT EXISTS futures_trades (
 
 CREATE INDEX IF NOT EXISTS idx_futures_trades_position ON futures_trades (position_id);
 CREATE INDEX IF NOT EXISTS idx_futures_trades_created ON futures_trades (created_at);
+
+-- ============================================================
+-- Cross-exchange arbitrage bot — the fourth, independent bot. Paper-only:
+-- watches public price feeds across several exchanges (no API keys needed
+-- for market data) and simulates buying on whichever is cheapest and
+-- selling on whichever is priciest for the same coin, net of an estimated
+-- round-trip fee. No real orders, no real exchange credentials — see
+-- arb/controller.ts for why (execution-speed and pre-funding realities
+-- make literal live cross-exchange arbitrage a much bigger undertaking).
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS arb_bot_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  running INTEGER NOT NULL DEFAULT 0,
+  emergency_stopped INTEGER NOT NULL DEFAULT 0,
+  emergency_stopped_at TEXT,
+  emergency_stopped_reason TEXT,
+  emergency_stopped_by TEXT,
+  last_scan_at TEXT,
+  total_scans INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS arb_paper_account (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  starting_balance_usd TEXT NOT NULL,
+  cash_balance_usd TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS arb_opportunities (
+  id TEXT PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  buy_exchange TEXT NOT NULL,
+  buy_price TEXT NOT NULL,
+  sell_exchange TEXT NOT NULL,
+  sell_price TEXT NOT NULL,
+  gross_spread_pct TEXT NOT NULL,
+  net_spread_pct TEXT NOT NULL,
+  acted INTEGER NOT NULL DEFAULT 0,
+  skip_reason TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_arb_opportunities_created ON arb_opportunities (created_at);
+CREATE INDEX IF NOT EXISTS idx_arb_opportunities_symbol ON arb_opportunities (symbol);
+
+CREATE TABLE IF NOT EXISTS arb_trades (
+  id TEXT PRIMARY KEY,
+  opportunity_id TEXT REFERENCES arb_opportunities (id) ON DELETE SET NULL,
+  symbol TEXT NOT NULL,
+  buy_exchange TEXT NOT NULL,
+  buy_price TEXT NOT NULL,
+  sell_exchange TEXT NOT NULL,
+  sell_price TEXT NOT NULL,
+  qty TEXT NOT NULL,
+  notional_usd TEXT NOT NULL,
+  gross_profit_usd TEXT NOT NULL,
+  fee_usd TEXT NOT NULL,
+  net_profit_usd TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_arb_trades_created ON arb_trades (created_at);

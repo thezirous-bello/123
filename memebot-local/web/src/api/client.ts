@@ -302,6 +302,17 @@ export const api = {
   futuresPositions: (mode?: BybitMode) => get<FuturesPosition[]>(`/futures/positions${mode ? `?mode=${mode}` : ""}`),
   futuresTrades: () => get<FuturesTrade[]>("/futures/trades"),
   closeFuturesPosition: (id: string) => post(`/futures/positions/${id}/close`),
+
+  arbStatus: () => get<ArbStatus>("/arb/status"),
+  arbWallet: () => get<ArbWallet>("/arb/wallet"),
+  arbConfig: () => get<ArbStrategyConfig>("/arb/config"),
+  updateArbConfig: (patchBody: Partial<ArbStrategyConfig>) => patch<ArbStrategyConfig>("/arb/config", patchBody),
+  arbStart: () => post("/arb/control/start"),
+  arbStop: () => post("/arb/control/stop"),
+  arbEmergencyStop: (reason: string) => post("/arb/control/emergency-stop", { reason }),
+  arbResume: () => post("/arb/control/resume", { confirm: true }),
+  arbOpportunities: () => get<ArbOpportunity[]>("/arb/opportunities"),
+  arbTrades: () => get<ArbTrade[]>("/arb/trades"),
 };
 
 // ---- Bybit bots: shared types ----
@@ -590,7 +601,73 @@ export interface FuturesTrade {
   created_at: string;
 }
 
-export type ProviderId = "dexscreener" | "solanaRpc" | "jupiter" | "helius" | "bybit" | "fearGreed";
+// ---- Cross-exchange arbitrage bot (paper-only) ----
+
+export type ExchangeId = "binance" | "bybit" | "okx" | "kucoin" | "gateio" | "mexc";
+
+export interface ArbStatus {
+  running: boolean;
+  emergencyStopped: boolean;
+  emergencyStoppedAt: string | null;
+  emergencyStoppedReason: string | null;
+  lastScanAt: string | null;
+  totalScans: number;
+  strategyEnabled: boolean;
+  exchanges: ExchangeId[];
+  updatedAt: string;
+}
+
+export interface ArbWallet {
+  cashBalanceUsd: string;
+  startingBalanceUsd: string;
+  realizedPnl24hUsd: string;
+}
+
+export interface ArbStrategyConfig {
+  enabled: boolean;
+  exchanges: ExchangeId[];
+  symbols: string[];
+  scanIntervalSeconds: number;
+  positionSizeUsd: number;
+  maxTradesPerScan: number;
+  perSymbolCooldownSeconds: number;
+  takerFeePctOverride: number | null;
+  safetyBufferPct: number;
+  minNetSpreadPct: number;
+  startingBalanceUsd: number;
+}
+
+export interface ArbOpportunity {
+  id: string;
+  symbol: string;
+  buyExchange: ExchangeId;
+  buyPrice: string;
+  sellExchange: ExchangeId;
+  sellPrice: string;
+  grossSpreadPct: string;
+  netSpreadPct: string;
+  acted: boolean;
+  skipReason: string | null;
+  createdAt: string;
+}
+
+export interface ArbTrade {
+  id: string;
+  opportunityId: string | null;
+  symbol: string;
+  buyExchange: ExchangeId;
+  buyPrice: string;
+  sellExchange: ExchangeId;
+  sellPrice: string;
+  qty: string;
+  notionalUsd: string;
+  grossProfitUsd: string;
+  feeUsd: string;
+  netProfitUsd: string;
+  createdAt: string;
+}
+
+export type ProviderId = "dexscreener" | "solanaRpc" | "jupiter" | "helius" | "bybit" | "fearGreed" | "binance" | "okx" | "kucoin" | "gateio" | "mexc";
 
 export interface ProviderHealth {
   provider: ProviderId;

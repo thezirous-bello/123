@@ -77,6 +77,24 @@ function runMigrations() {
     ).run(now);
   }
 
+  const arbAccount = db.prepare("SELECT id FROM arb_paper_account WHERE id = 1").get();
+  if (!arbAccount) {
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO arb_paper_account (id, starting_balance_usd, cash_balance_usd, created_at, updated_at)
+       VALUES (1, '10000', '10000', ?, ?)`,
+    ).run(now, now);
+  }
+
+  const arbState = db.prepare("SELECT id FROM arb_bot_state WHERE id = 1").get();
+  if (!arbState) {
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO arb_bot_state (id, running, emergency_stopped, total_scans, updated_at)
+       VALUES (1, 0, 0, 0, ?)`,
+    ).run(now);
+  }
+
   logger.info({ dbPath }, "database ready");
 }
 
