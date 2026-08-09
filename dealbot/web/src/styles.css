@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #06070a;
+  --color-panel: #0d1117;
+  --color-panel-border: #1c232c;
+  --color-accent: #2dd4bf;
+  --color-good: #34d399;
+  --color-warn: #fbbf24;
+  --color-danger: #f87171;
+
+  --color-teal-300: #7ce9d9;
+  --color-teal-400: #2dd4bf;
+  --color-teal-500: #14b8a6;
+  --color-teal-600: #0d9488;
+
+  --color-emerald-300: #86efac;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
+  --color-red-500: #ef4444;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-bg);
+  background-image: radial-gradient(ellipse 1100px 550px at 15% -10%, rgba(45, 212, 191, 0.05), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 100% 0%, rgba(52, 211, 153, 0.03), transparent 55%);
+  background-attachment: fixed;
+  color: #dbe4ec;
+  font-feature-settings: "tnum" 1;
+}
+
+.glass-panel {
+  background: rgba(13, 17, 23, 0.88);
+  backdrop-filter: blur(6px);
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
+@keyframes fade-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-slide-in {
+  animation: fade-slide-in 260ms ease-out;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1c232c;
+  border-radius: 4px;
+}
