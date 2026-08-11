@@ -40,8 +40,8 @@ function curvePath(from: { x: number; y: number }, to: { x: number; y: number },
   return `M${from.x},${from.y} Q${midX + offsetX},${midY + offsetY} ${to.x},${to.y}`;
 }
 
-const VIEW_W = 820;
-const VIEW_H = 400;
+const VIEW_W = 1000;
+const VIEW_H = 500;
 const LOCAL = { x: VIEW_W / 2, y: VIEW_H / 2 };
 
 /** Deterministic 0..1 hash of a string, used only for stable per-node
@@ -62,8 +62,8 @@ function radialLayout(services: ServiceNode[]): Array<ServiceNode & { x: number;
   // Separate X/Y radii (not a single circle scaled by a fudge factor) so
   // nodes + their label text stay inside the canvas regardless of its
   // aspect ratio, leaving fixed padding for the label above/below each dot.
-  const radiusX = VIEW_W / 2 - 95;
-  const radiusY = VIEW_H / 2 - 55;
+  const radiusX = VIEW_W / 2 - 105;
+  const radiusY = VIEW_H / 2 - 65;
   return services.map((s, i) => {
     const angle = (2 * Math.PI * i) / n - Math.PI / 2;
     const jitter = (hash01(s.id + i) - 0.5) * 0.16;
@@ -177,7 +177,7 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
         </p>
       )}
 
-      <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="mx-auto block w-full max-w-[720px]">
+      <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="mx-auto block w-full max-w-[960px]">
         <defs>
           <radialGradient id="hub-glow" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="#FF2D9B" stopOpacity={0.35} />
@@ -323,7 +323,7 @@ const PARTICLE_PALETTE = ["#00FFC8", "#00FFC8", "#00FFC8", "#00E5FF", "#FF2D9B",
  * instead of smooth motion). */
 function useParticleField(serviceCount: number): Particle[] {
   return useMemo(() => {
-    const count = Math.min(150, 70 + serviceCount * 8);
+    const count = Math.min(260, 120 + serviceCount * 14);
     const particles: Particle[] = [];
     for (let i = 0; i < count; i++) {
       particles.push({
@@ -332,14 +332,13 @@ function useParticleField(serviceCount: number): Particle[] {
         r: 0.5 + Math.random() * 1.3,
         color: PARTICLE_PALETTE[Math.floor(Math.random() * PARTICLE_PALETTE.length)]!,
         opacity: 0.16 + Math.random() * 0.32,
-        // Short, continuously-cycling durations (was 3.5-8.5s) so the web
-        // reads as moving in real time on its own, not just during a
-        // boosted burst — the boost on top of this just makes it faster
-        // and brighter still.
-        dur: 1.6 + Math.random() * 2.2,
-        delay: Math.random() * 2,
-        dx: (Math.random() - 0.5) * 16,
-        dy: (Math.random() - 0.5) * 16,
+        // Fast, continuously-cycling durations so the web reads as moving
+        // in real time on its own, not just during a boosted burst — the
+        // boost on top of this just makes it faster and brighter still.
+        dur: 0.8 + Math.random() * 1.1,
+        delay: Math.random() * 1.2,
+        dx: (Math.random() - 0.5) * 30,
+        dy: (Math.random() - 0.5) * 30,
       });
     }
     return particles;
@@ -351,8 +350,8 @@ function useParticleField(serviceCount: number): Particle[] {
  * de-duplicated — the faint "spider web" mesh texture behind the real
  * nodes. Computed once alongside the particle field itself. */
 function buildMesh(particles: Particle[]): Array<[Particle, Particle]> {
-  const maxDist = 62;
-  const maxLinksPerNode = 3;
+  const maxDist = 85;
+  const maxLinksPerNode = 5;
   const seen = new Set<string>();
   const lines: Array<[Particle, Particle]> = [];
   for (let i = 0; i < particles.length; i++) {
