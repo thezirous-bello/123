@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api, type SecurityReport, type TokenSnapshot, type WatchlistEntry } from "../api/client.js";
+import { useEffect, useMemo, useState } from "react";
+import { api, type RankedMomentumRow, type SecurityReport, type TokenSnapshot, type WatchlistEntry } from "../api/client.js";
 import { useRefreshSignal } from "../hooks/useRefreshSignal.js";
 import { Panel } from "./Panel.js";
 import { Badge } from "./Badge.js";
@@ -11,8 +11,21 @@ const RISK_TONE: Record<string, "good" | "warn" | "danger" | "neutral"> = {
   critical: "danger",
 };
 
+const STATUS_TONE: Record<string, "good" | "warn" | "danger" | "neutral"> = {
+  entered: "good",
+  signal: "good",
+  watching: "neutral",
+  rejected: "warn",
+};
+
 function shortMint(mint: string): string {
   return `${mint.slice(0, 6)}…${mint.slice(-6)}`;
+}
+
+function scoreTone(score: number): string {
+  if (score >= 70) return "text-emerald-400";
+  if (score >= 45) return "text-amber-300";
+  return "text-white/50";
 }
 
 export function TokenScanner() {
@@ -23,12 +36,26 @@ export function TokenScanner() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ snapshot: TokenSnapshot; security: SecurityReport } | null>(null);
   const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
+  const [ranking, setRanking] = useState<RankedMomentumRow[]>([]);
   const [discovering, setDiscovering] = useState(false);
   const [discoverMsg, setDiscoverMsg] = useState<string | null>(null);
 
   useEffect(() => {
     api.watchlist().then(setWatchlist).catch(() => {});
+    api.tokenRanking().then(setRanking).catch(() => {});
   }, [tick]);
+
+  const rankingByMint = useMemo(() => new Map(ranking.map((r) => [r.mint, r])), [ranking]);
+
+  // Sorted by the bot's own calculated opportunity (momentum) score, not
+  // simply time added — tokens not scanned yet (no ranking row) sort last.
+  const sortedWatchlist = useMemo(() => {
+    return [...watchlist].sort((a, b) => {
+      const scoreA = rankingByMint.get(a.mint)?.totalScore ?? -1;
+      const scoreB = rankingByMint.get(b.mint)?.totalScore ?? -1;
+      return scoreB - scoreA;
+    });
+  }, [watchlist, rankingByMint]);
 
   async function discoverNow() {
     setDiscovering(true);
@@ -89,67 +116,90 @@ export function TokenScanner() {
       >
         <p className="mb-3 text-xs text-white/40">
           While the bot is running it automatically pulls trending/boosted Solana tokens from DexScreener every 5 minutes and adds new ones here —
-          you don't have to add tokens yourself. "Discover Now" runs that same pass immediately instead of waiting.
+          you don't have to add tokens yourself. "Discover Now" runs that same pass immediately instead of waiting. Ranked by the bot's own
+          momentum opportunity score, not just 24h gain — see the Momentum column.
         </p>
         {discoverMsg && <p className="mb-3 text-xs text-violet-300">{discoverMsg}</p>}
         {watchlist.length === 0 ? (
           <p className="text-sm text-white/40">Nothing watched yet. Start the bot to let it auto-discover, or click "Discover Now".</p>
         ) : (
-          <div className="max-h-64 overflow-y-auto">
+          <div className="max-h-80 overflow-x-auto overflow-y-auto">
             <table className="w-full text-left text-sm">
               <thead className="sticky top-0 bg-[#0B1017] text-xs uppercase text-white/40">
                 <tr>
-                  <th className="pb-2">Token</th>
-                  <th className="pb-2">Mint</th>
-                  <th className="pb-2">Added</th>
+                  <th className="pb-2 pr-3">Token</th>
+                  <th className="pb-2 pr-3">Momentum</th>
+                  <th className="pb-2 pr-3">Trend</th>
+                  <th className="pb-2 pr-3">Vol Accel</th>
+                  <th className="pb-2 pr-3">Buy/Sell</th>
+                  <th className="pb-2 pr-3">Liquidity</th>
+                  <th className="pb-2 pr-3">Status</th>
+                  <th className="pb-2 pr-3">Added</th>
                   <th className="pb-2"></th>
                 </tr>
               </thead>
               <tbody>
-                {watchlist.map((w) => (
-                  <tr key={w.mint} className="border-t border-white/5">
-                    <td className="py-1.5">{w.symbol ?? <span className="text-white/30">unknown</span>}</td>
-                    <td className="py-1.5 font-mono text-xs text-white/40">{shortMint(w.mint)}</td>
-                    <td className="py-1.5 text-xs text-white/40">{new Date(w.addedAt).toLocaleTimeString()}</td>
-                    <td className="py-1.5 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => inspect(w.mint)} className="rounded border border-white/15 px-2 py-0.5 text-xs hover:bg-white/10">
-                          Details
-                        </button>
-                        {w.blocked ? (
+                {sortedWatchlist.map((w) => {
+                  const r = rankingByMint.get(w.mint);
+                  return (
+                    <tr key={w.mint} className="border-t border-white/5">
+                      <td className="py-1.5 pr-3">
+                        <p>{w.symbol ?? <span className="text-white/30">unknown</span>}</p>
+                        <p className="font-mono text-[10px] text-white/40">{shortMint(w.mint)}</p>
+                      </td>
+                      <td className={`py-1.5 pr-3 font-semibold ${r ? scoreTone(r.totalScore) : "text-white/30"}`}>
+                        {r ? `${r.totalScore.toFixed(0)}/100${r.momentumAccelerating ? " ↑" : ""}` : "—"}
+                      </td>
+                      <td className="py-1.5 pr-3 text-xs text-white/60">{r ? r.trendDirection : "—"}</td>
+                      <td className={`py-1.5 pr-3 text-xs ${r?.volumeAccelerating ? "text-emerald-400" : "text-white/40"}`}>
+                        {r?.volumeAccelerating ? "accelerating" : r ? "flat" : "—"}
+                      </td>
+                      <td className={`py-1.5 pr-3 text-xs ${r?.buyPressureDominant ? "text-emerald-400" : "text-white/40"}`}>
+                        {r?.buySellRatio != null ? `${Math.round(r.buySellRatio * 100)}% buy` : "—"}
+                      </td>
+                      <td className="py-1.5 pr-3 text-xs text-white/60">{r?.liquidityUsd != null ? `$${Math.round(r.liquidityUsd).toLocaleString()}` : "—"}</td>
+                      <td className="py-1.5 pr-3">{r ? <Badge tone={STATUS_TONE[r.tradeStatus] ?? "neutral"}>{r.tradeStatus.toUpperCase()}</Badge> : <span className="text-xs text-white/30">unscanned</span>}</td>
+                      <td className="py-1.5 pr-3 text-xs text-white/40">{new Date(w.addedAt).toLocaleTimeString()}</td>
+                      <td className="py-1.5 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => inspect(w.mint)} className="rounded border border-white/15 px-2 py-0.5 text-xs hover:bg-white/10">
+                            Details
+                          </button>
+                          {w.blocked ? (
+                            <button
+                              onClick={async () => {
+                                await api.unblockToken(w.mint);
+                                setWatchlist(await api.watchlist());
+                              }}
+                              className="rounded border border-white/15 px-2 py-0.5 text-xs hover:bg-white/10"
+                            >
+                              Unblock
+                            </button>
+                          ) : (
+                            <button
+                              onClick={async () => {
+                                await api.blockToken(w.mint);
+                                setWatchlist(await api.watchlist());
+                              }}
+                              className="rounded border border-red-500/40 px-2 py-0.5 text-xs text-red-300 hover:bg-red-500/10"
+                            >
+                              Block
+                            </button>
+                          )}
                           <button
                             onClick={async () => {
-                              await api.unblockToken(w.mint);
+                              await api.removeWatchlist(w.mint);
                               setWatchlist(await api.watchlist());
                             }}
                             className="rounded border border-white/15 px-2 py-0.5 text-xs hover:bg-white/10"
                           >
-                            Unblock
+                            Remove
                           </button>
-                        ) : (
-                          <button
-                            onClick={async () => {
-                              await api.blockToken(w.mint);
-                              setWatchlist(await api.watchlist());
-                            }}
-                            className="rounded border border-red-500/40 px-2 py-0.5 text-xs text-red-300 hover:bg-red-500/10"
-                          >
-                            Block
-                          </button>
-                        )}
-                        <button
-                          onClick={async () => {
-                            await api.removeWatchlist(w.mint);
-                            setWatchlist(await api.watchlist());
-                          }}
-                          className="rounded border border-white/15 px-2 py-0.5 text-xs hover:bg-white/10"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

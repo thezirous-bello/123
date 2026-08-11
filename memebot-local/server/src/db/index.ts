@@ -41,6 +41,23 @@ function runMigrations() {
   ensureColumn("futures_signals", "position_size_pct", "TEXT NOT NULL DEFAULT '30'");
   ensureColumn("futures_positions", "confidence", "TEXT NOT NULL DEFAULT 'medium'");
 
+  // Expanded market-data windows for anyone upgrading from a version of
+  // this app that only tracked 5m/1h. See market/types.ts TokenSnapshot.
+  ensureColumn("token_snapshots", "volume_6h_usd", "TEXT");
+  ensureColumn("token_snapshots", "volume_24h_usd", "TEXT");
+  ensureColumn("token_snapshots", "price_change_6h_pct", "TEXT");
+  ensureColumn("token_snapshots", "price_change_24h_pct", "TEXT");
+  ensureColumn("token_snapshots", "buys_1h", "INTEGER");
+  ensureColumn("token_snapshots", "sells_1h", "INTEGER");
+  ensureColumn("token_snapshots", "buys_6h", "INTEGER");
+  ensureColumn("token_snapshots", "sells_6h", "INTEGER");
+  ensureColumn("token_snapshots", "buys_24h", "INTEGER");
+  ensureColumn("token_snapshots", "sells_24h", "INTEGER");
+  // Low-water-mark counterpart to trailing_stop_high_usd, for max-adverse-
+  // excursion (MAE) logging alongside the existing max-favorable-excursion
+  // (trailing high).
+  ensureColumn("positions", "lowest_price_seen_usd", "TEXT");
+
   const account = db.prepare("SELECT id FROM paper_account WHERE id = 1").get();
   if (!account) {
     const now = new Date().toISOString();

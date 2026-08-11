@@ -6,6 +6,11 @@ import type { TokenSnapshot } from "./types.js";
 
 const SOLANA_CHAIN_ID = "solana";
 
+interface DexScreenerTxnWindow {
+  buys?: number;
+  sells?: number;
+}
+
 interface DexScreenerPair {
   chainId: string;
   dexId: string;
@@ -16,9 +21,9 @@ interface DexScreenerPair {
   liquidity?: { usd?: number };
   fdv?: number;
   marketCap?: number;
-  volume?: { m5?: number; h1?: number };
-  priceChange?: { m5?: number; h1?: number };
-  txns?: { m5?: { buys?: number; sells?: number } };
+  volume?: { m5?: number; h1?: number; h6?: number; h24?: number };
+  priceChange?: { m5?: number; h1?: number; h6?: number; h24?: number };
+  txns?: { m5?: DexScreenerTxnWindow; h1?: DexScreenerTxnWindow; h6?: DexScreenerTxnWindow; h24?: DexScreenerTxnWindow };
   pairCreatedAt?: number;
 }
 
@@ -57,10 +62,23 @@ function pairToSnapshot(pair: DexScreenerPair): TokenSnapshot {
     fdvUsd: pair.fdv ?? null,
     volume5mUsd: pair.volume?.m5 ?? null,
     volume1hUsd: pair.volume?.h1 ?? null,
+    volume6hUsd: pair.volume?.h6 ?? null,
+    volume24hUsd: pair.volume?.h24 ?? null,
+    volume1mUsd: null, // derived from stored history, not a DexScreener field
     priceChange5mPct: pair.priceChange?.m5 ?? null,
     priceChange1hPct: pair.priceChange?.h1 ?? null,
+    priceChange6hPct: pair.priceChange?.h6 ?? null,
+    priceChange24hPct: pair.priceChange?.h24 ?? null,
+    priceChange1mPct: null, // derived from stored history, not a DexScreener field
+    priceChange15mPct: null, // derived from stored history, not a DexScreener field
     buys5m: pair.txns?.m5?.buys ?? null,
     sells5m: pair.txns?.m5?.sells ?? null,
+    buys1h: pair.txns?.h1?.buys ?? null,
+    sells1h: pair.txns?.h1?.sells ?? null,
+    buys6h: pair.txns?.h6?.buys ?? null,
+    sells6h: pair.txns?.h6?.sells ?? null,
+    buys24h: pair.txns?.h24?.buys ?? null,
+    sells24h: pair.txns?.h24?.sells ?? null,
     pairCreatedAt: pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : null,
     dexId: pair.dexId ?? null,
     pairAddress: pair.pairAddress ?? null,

@@ -4,6 +4,8 @@ export type ProviderId =
   | "dexscreener"
   | "solanaRpc"
   | "jupiter"
+  | "jupiterPrice"
+  | "birdeye"
   | "helius"
   | "bybit"
   | "fearGreed"

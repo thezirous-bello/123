@@ -8,6 +8,8 @@ import { latestSecurityReport, persistSecurityReport, runTokenSecurityAnalysis }
 import { addToWatchlist, listWatchlist, removeFromWatchlist, setTokenBlocked } from "../market/watchlist.js";
 import { runAutoDiscovery } from "../engine/botController.js";
 import { Decimal } from "../lib/decimal.js";
+import { fetchBirdeyeEnrichment } from "../market/birdeye.js";
+import { listLatestMomentumScores } from "../market/momentumRepository.js";
 
 const SearchQuerySchema = z.object({ q: z.string().min(1).max(100) });
 const WatchlistBodySchema = z.object({ mint: z.string().min(32).max(64), symbol: z.string().optional(), name: z.string().optional() });
@@ -34,8 +36,18 @@ export default async function tokenRoutes(app: FastifyInstance) {
     const security = runTokenSecurityAnalysis({ mint, snapshot, onchain, holders, sellRoute });
     persistSecurityReport(security);
 
-    return { snapshot, onchain, holders, security };
+    // Best-effort, on-demand only — never called from the per-tick scan
+    // loop, so a single-token detail lookup can't burn through Birdeye's
+    // rate limits the way calling it for the whole watchlist would.
+    const birdeye = await fetchBirdeyeEnrichment(mint);
+
+    return { snapshot, onchain, holders, security, birdeye };
   });
+
+  /** The live ranked opportunity table: every currently-watched token's most
+   * recent momentum score, sorted by the bot's own opportunity score rather
+   * than raw 24h gain — see market/momentum.ts and momentumRepository.ts. */
+  app.get("/tokens/ranking", async () => listLatestMomentumScores(150));
 
   app.get("/tokens/:mint/history", async (request) => {
     const { mint } = request.params as { mint: string };

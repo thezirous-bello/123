@@ -10,6 +10,8 @@ export const ALL_BOT_SERVICES: ServiceNode[] = [
   { id: "dexscreener", label: "DEXSCREENER", x: 600, y: 60 },
   { id: "solanaRpc", label: "SOLANA RPC", x: 690, y: 230 },
   { id: "jupiter", label: "JUPITER", x: 600, y: 400 },
+  { id: "jupiterPrice", label: "JUPITER PRICE", x: 630, y: 480 },
+  { id: "birdeye", label: "BIRDEYE (optional)", x: 250, y: 480 },
   { id: "helius", label: "HELIUS (optional)", x: 350, y: 420 },
   { id: "bybit", label: "BYBIT", x: 100, y: 340 },
   { id: "fearGreed", label: "FEAR & GREED", x: 100, y: 100 },

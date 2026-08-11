@@ -39,6 +39,22 @@ export const StrategyRulesObjectSchema = z
     minimumPriceChange1hPct: z.number().optional(),
     maximumPriceChange1hPct: z.number().optional(),
 
+    // Momentum-quality entry gating. Left undefined here means "use the
+    // account-level momentum config" (lib/settings.ts MomentumConfigSchema),
+    // which itself defaults to real gating on — this strategy is only for
+    // strategies that need a *different* threshold than the account default,
+    // not for opting out of momentum confirmation entirely.
+    minimumMomentumScore: z.number().gte(0).max(100).optional(),
+    requireVolumeAccelerating: z.boolean().optional(),
+    requireBuyPressureDominant: z.boolean().optional(),
+    requireTxAccelerating: z.boolean().optional(),
+    requireTrendBullish: z.boolean().optional(),
+
+    // Dynamic momentum-based exit gating — same fallback-to-account-default
+    // behavior as the entry fields above.
+    exitOnMomentumReversal: z.boolean().optional(),
+    exitMomentumScoreThreshold: z.number().gte(0).max(100).optional(),
+
     // Execution limits
     maximumSlippagePercentage: z.number().gt(0).max(50).default(3),
     maximumPriceImpactPercentage: z.number().gt(0).max(50).default(2),

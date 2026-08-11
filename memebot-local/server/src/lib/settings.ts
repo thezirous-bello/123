@@ -55,6 +55,72 @@ export function updateRiskLimits(partial: Partial<RiskLimits>): RiskLimits {
   return saveRiskLimits(RiskLimitsSchema.parse({ ...current, ...partial }));
 }
 
+// Weights for the seven momentum-score components (see market/momentum.ts).
+// Stored as configurable settings rather than hardcoded, per the "make
+// thresholds/weights configurable" requirement — tune these if live results
+// show a different mix predicts continuing momentum better. Weights are
+// normalized (don't need to sum to exactly 100) whenever a component's data
+// is unavailable and has to be excluded from the score.
+export const MomentumConfigSchema = z
+  .object({
+    weightPriceMomentum: z.number().gte(0).max(100).default(25),
+    weightVolumeAcceleration: z.number().gte(0).max(100).default(20),
+    weightBuyPressure: z.number().gte(0).max(100).default(15),
+    weightTxAcceleration: z.number().gte(0).max(100).default(15),
+    weightLiquidityQuality: z.number().gte(0).max(100).default(10),
+    weightTrendStrength: z.number().gte(0).max(100).default(10),
+    weightExecutionQuality: z.number().gte(0).max(100).default(5),
+
+    // Entry gating defaults — a strategy may override these per-strategy
+    // (see strategy/schema.ts), these are what a strategy gets if it
+    // doesn't specify its own.
+    minMomentumScoreToEnter: z.number().gte(0).max(100).default(60),
+    requireVolumeAccelerating: z.boolean().default(true),
+    requireBuyPressureDominant: z.boolean().default(true),
+    requireTxAccelerating: z.boolean().default(false),
+    requireTrendBullish: z.boolean().default(true),
+
+    // Dynamic-exit gating — evaluated continuously against open positions.
+    exitOnMomentumReversal: z.boolean().default(true),
+    exitMomentumScoreThreshold: z.number().gte(0).max(100).default(35),
+    exitOnSellPressureReversal: z.boolean().default(true),
+    /** Sell/buy ratio (0-1, sells as a fraction of buys+sells) at which a
+     * profitable position is considered to have flipped to net sell
+     * pressure and eligible for the sell_pressure_reversal exit. */
+    sellPressureReversalRatio: z.number().gt(0.5).lt(1).default(0.65),
+  })
+  .strict();
+
+export type MomentumConfig = z.infer<typeof MomentumConfigSchema>;
+
+const MOMENTUM_CONFIG_KEY = "momentum_config";
+
+export function getMomentumConfig(): MomentumConfig {
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(MOMENTUM_CONFIG_KEY) as
+    | { value: string }
+    | undefined;
+  if (!row) {
+    const defaults = MomentumConfigSchema.parse({});
+    saveMomentumConfig(defaults);
+    return defaults;
+  }
+  return MomentumConfigSchema.parse(JSON.parse(row.value));
+}
+
+export function saveMomentumConfig(config: MomentumConfig): MomentumConfig {
+  const validated = MomentumConfigSchema.parse(config);
+  db.prepare(
+    `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+  ).run(MOMENTUM_CONFIG_KEY, JSON.stringify(validated), nowIso());
+  return validated;
+}
+
+export function updateMomentumConfig(partial: Partial<MomentumConfig>): MomentumConfig {
+  const current = getMomentumConfig();
+  return saveMomentumConfig(MomentumConfigSchema.parse({ ...current, ...partial }));
+}
+
 const PAPER_STARTING_BALANCE_KEY = "paper_starting_balance_usd";
 
 export function getPaperStartingBalanceDefault(): number {

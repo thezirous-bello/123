@@ -5,20 +5,22 @@ import { checkSellRoute } from "../jupiter/quote.js";
 import { quoteTokenDecimals, quoteTokenMint } from "../jupiter/constants.js";
 import { fetchHolderConcentration, fetchOnChainMintInfo } from "../market/onchain.js";
 import { discoverTrendingSolanaMints } from "../market/discovery.js";
-import { getFreshTokenSnapshot, isSnapshotFresh, MAX_SNAPSHOT_AGE_SECONDS } from "../market/snapshotService.js";
+import { getFreshTokenSnapshot, isSnapshotFresh, listRecentSnapshots, MAX_SNAPSHOT_AGE_SECONDS } from "../market/snapshotService.js";
 import { addToWatchlist, listWatchlist } from "../market/watchlist.js";
 import { persistSecurityReport, runTokenSecurityAnalysis } from "../security/tokenSecurity.js";
+import { computeMomentumScore, computeRecentHigh, type MomentumScoreResult } from "../market/momentum.js";
+import { recordMomentumScore } from "../market/momentumRepository.js";
 import { getActiveStrategy } from "../strategy/repository.js";
 import { getBotState, isEmergencyStopped, setActiveStrategy, setMode, setRunning, type BotState } from "./emergency.js";
 import { executeLiveBuy, executeLiveSell } from "./liveEngine.js";
 import { executePaperBuy, executePaperSell } from "./paperEngine.js";
 import { getPaperAccount } from "./paperAccount.js";
 import { accountEquityUsd, assessEntryRisk } from "./riskEngine.js";
-import { evaluateEntryConditions, evaluateHolderConcentration } from "./strategyEvaluator.js";
+import { evaluateEntryConditions, evaluateHolderConcentration, evaluateMomentumConditions } from "./strategyEvaluator.js";
 import { evaluateExitAction, resolveSellTokenAmount } from "./positionManager.js";
-import { getPosition, listOpenPositions, updateTrailingHigh, type Position } from "./positionRepository.js";
+import { getPosition, listOpenPositions, updatePriceExtremes, type Position } from "./positionRepository.js";
 import { getSolBalance } from "../wallet/walletManager.js";
-import { getRiskLimits } from "../lib/settings.js";
+import { getMomentumConfig, getRiskLimits } from "../lib/settings.js";
 import { getSolUsdPrice } from "../market/pricing.js";
 import { hasOpenPositionAnyMode, openPositionForMint, type Mode } from "./queries.js";
 import { removeFromWatchlist } from "../market/watchlist.js";
@@ -260,6 +262,19 @@ async function tick(mode: Mode) {
   }
 }
 
+/** Computes a momentum snapshot for an already-open position without any
+ * extra network calls beyond the market-data refresh manageOpenPositions
+ * already has to do every tick — execution-quality (price impact) is
+ * skipped here rather than re-querying Jupiter for every open position on
+ * every 20s tick, which would burn through rate limits fast; a fresh quote
+ * is still always requested immediately before the exit actually executes
+ * (see executeExit -> executePaperSell/executeLiveSell). */
+function computeHoldingMomentum(snapshot: TokenSnapshot): MomentumScoreResult {
+  const history = listRecentSnapshots(snapshot.mint, 120);
+  const recentHigh = computeRecentHigh(history);
+  return computeMomentumScore({ snapshot, priceImpactPct: null, recentHighUsd: recentHigh }, getMomentumConfig());
+}
+
 async function manageOpenPositions(mode: Mode) {
   const positions = listOpenPositions(mode);
   for (const position of positions) {
@@ -267,21 +282,22 @@ async function manageOpenPositions(mode: Mode) {
     if (!snapshot || snapshot.priceUsd === null) continue;
     const currentPrice = new Decimal(snapshot.priceUsd);
 
-    updateTrailingHigh(position.id, currentPrice);
+    updatePriceExtremes(position.id, currentPrice);
     const refreshed = getPosition(position.id);
     if (!refreshed) continue;
 
-    const action = evaluateExitAction(refreshed, currentPrice);
+    const momentum = computeHoldingMomentum(snapshot);
+    const action = evaluateExitAction(refreshed, currentPrice, new Date(), momentum, getMomentumConfig());
     if (!action) continue;
 
     const sellAmount = resolveSellTokenAmount(refreshed, action);
     if (sellAmount.lte(0)) continue;
 
-    await executeExit(mode, refreshed, sellAmount, action.reason);
+    await executeExit(mode, refreshed, sellAmount, action.reason, momentum);
   }
 }
 
-async function executeExit(mode: Mode, position: Position, sellAmount: Decimal, reason: string) {
+async function executeExit(mode: Mode, position: Position, sellAmount: Decimal, reason: string, momentum?: MomentumScoreResult) {
   const limits = getRiskLimits();
   const idempotencyKey = `${position.id}:${reason}:${tickCounter}`;
   const quoteToken: "SOL" | "USDC" = "SOL";
@@ -307,6 +323,24 @@ async function executeExit(mode: Mode, position: Position, sellAmount: Decimal, 
     // A sell just freed up balance — don't make discovery wait out the
     // rest of the 3-minute timer to notice.
     lastDiscoveryAtMs = 0;
+
+    // Max favorable/adverse excursion — logged for every exit so later
+    // analysis can tell which signals actually predicted a profitable
+    // continuation vs. which ones should have exited sooner/later.
+    const refreshed = getPosition(position.id);
+    if (refreshed) {
+      const entry = refreshed.entryPriceUsd;
+      const high = refreshed.trailingStopHighUsd ?? entry;
+      const low = refreshed.lowestPriceSeenUsd ?? entry;
+      const mfePct = entry.gt(0) ? high.minus(entry).div(entry).times(100) : new Decimal(0);
+      const maePct = entry.gt(0) ? low.minus(entry).div(entry).times(100) : new Decimal(0);
+      recordLog(
+        "info",
+        "position",
+        `Closed ${position.symbol ?? position.mint} (${reason}): MFE +${mfePct.toFixed(2)}%, MAE ${maePct.toFixed(2)}%${momentum ? `, momentum at exit ${momentum.totalScore.toFixed(1)}/100` : ""}`,
+        { positionId: position.id, reason, mfePct: mfePct.toFixed(2), maePct: maePct.toFixed(2), momentum },
+      );
+    }
   }
 }
 
@@ -318,12 +352,16 @@ interface TokenScanPass {
   security: SecurityReport;
   sellRoute: { exists: boolean; priceImpactPct: number | null } | null;
   allConditions: EntryCondition[];
+  momentum: MomentumScoreResult;
 }
 
 /** The parallelizable half of entry evaluation: fetch market data, on-chain
- * checks, and security analysis for one token, and log the resulting
- * signal/rejection. Never touches the risk engine or places a trade — safe
- * to run many of these concurrently via mapWithConcurrency. */
+ * checks, security analysis, and momentum score for one token, and log the
+ * resulting signal/rejection — including tokens that get rejected, so the
+ * ranked table and audit trail cover every candidate the bot actually
+ * looked at, not just the ones it traded. Never touches the risk engine or
+ * places a trade — safe to run many of these concurrently via
+ * mapWithConcurrency. */
 async function scanToken(rules: StrategyRules, mint: string): Promise<TokenScanPass | null> {
   const snapshot = await getFreshTokenSnapshot(mint);
   if (!snapshot) {
@@ -346,7 +384,21 @@ async function scanToken(rules: StrategyRules, mint: string): Promise<TokenScanP
   const security = runTokenSecurityAnalysis({ mint, snapshot, onchain, holders, sellRoute });
   persistSecurityReport(security);
 
+  const history = listRecentSnapshots(mint, 120);
+  const recentHigh = computeRecentHigh(history);
+  const momentumConfig = getMomentumConfig();
+  const momentum = computeMomentumScore({ snapshot, priceImpactPct: sellRoute?.priceImpactPct ?? null, recentHighUsd: recentHigh }, momentumConfig);
+
   if (security.riskLevel === "critical") {
+    recordMomentumScore({
+      mint,
+      symbol: snapshot.symbol,
+      score: momentum,
+      liquidityUsd: snapshot.liquidityUsd,
+      priceImpactPct: sellRoute?.priceImpactPct ?? null,
+      tradeStatus: "rejected",
+      rejectionReason: `Critical risk: ${security.summary}`,
+    });
     recordLog("info", "strategy_evaluation", `Token rejected (critical risk): ${snapshot.symbol ?? mint}`, {
       mint,
       findings: security.findings,
@@ -356,25 +408,38 @@ async function scanToken(rules: StrategyRules, mint: string): Promise<TokenScanP
 
   const entryEval = evaluateEntryConditions(rules, snapshot, security);
   const holderCondition = evaluateHolderConcentration(rules, holders?.top10Percentage ?? null);
-  const allConditions = [...entryEval.conditions, holderCondition];
+  const momentumConditions = evaluateMomentumConditions(rules, momentumConfig, momentum);
+  const allConditions = [...entryEval.conditions, holderCondition, ...momentumConditions];
   const passed = allConditions.every((c) => c.passed);
   const firstFailure = allConditions.find((c) => !c.passed);
+
+  recordMomentumScore({
+    mint,
+    symbol: snapshot.symbol,
+    score: momentum,
+    liquidityUsd: snapshot.liquidityUsd,
+    priceImpactPct: sellRoute?.priceImpactPct ?? null,
+    tradeStatus: passed ? "signal" : "rejected",
+    rejectionReason: passed ? null : (firstFailure?.detail ?? "unknown reason"),
+  });
 
   recordLog(
     "info",
     "strategy_evaluation",
-    passed ? `Signal: ${snapshot.symbol ?? mint}` : `Rejected ${snapshot.symbol ?? mint}: ${firstFailure?.detail ?? "unknown reason"}`,
-    { mint, conditions: allConditions, snapshot },
+    passed
+      ? `Signal: ${snapshot.symbol ?? mint} (momentum ${momentum.totalScore.toFixed(1)}/100, ${momentum.trendDirection}${momentum.momentumAccelerating ? ", accelerating" : ""})`
+      : `Rejected ${snapshot.symbol ?? mint}: ${firstFailure?.detail ?? "unknown reason"}`,
+    { mint, conditions: allConditions, snapshot, momentum },
   );
 
-  return { mint, passed, snapshot, onchain, security, sellRoute, allConditions };
+  return { mint, passed, snapshot, onchain, security, sellRoute, allConditions, momentum };
 }
 
 /** The sequential half: given a token that already passed scanning, run it
  * through the risk engine and place the trade if approved. Always called
  * one at a time from tick() — see the comment there for why. */
 async function tryEnterFromScan(mode: Mode, strategyId: string, rules: StrategyRules, scan: TokenScanPass) {
-  const { mint, snapshot, onchain, security, sellRoute, allConditions } = scan;
+  const { mint, snapshot, onchain, security, sellRoute, allConditions, momentum } = scan;
 
   const account = getPaperAccount();
   const equityUsd = mode === "paper" ? accountEquityUsd(account.cashBalanceUsd, "paper") : await estimateLiveEquityUsd();
@@ -422,7 +487,7 @@ async function tryEnterFromScan(mode: Mode, strategyId: string, rules: StrategyR
     takeProfits: rules.takeProfits,
     trailingStopPercentage: rules.trailingStopPercentage ?? null,
     maxHoldingPeriodMinutes: rules.maxHoldingPeriodMinutes ?? null,
-    entryReason: { conditions: allConditions, security, strategyId },
+    entryReason: { conditions: allConditions, security, strategyId, momentum, marketDataAtEntry: snapshot },
     idempotencyKey,
   };
 

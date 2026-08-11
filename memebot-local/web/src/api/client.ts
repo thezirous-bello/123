@@ -126,13 +126,38 @@ export interface TokenSnapshot {
   fdvUsd: number | null;
   volume5mUsd: number | null;
   volume1hUsd: number | null;
+  volume6hUsd: number | null;
+  volume24hUsd: number | null;
   priceChange5mPct: number | null;
   priceChange1hPct: number | null;
+  priceChange6hPct: number | null;
+  priceChange24hPct: number | null;
+  priceChange1mPct: number | null;
+  priceChange15mPct: number | null;
   buys5m: number | null;
   sells5m: number | null;
+  buys1h: number | null;
+  sells1h: number | null;
   pairCreatedAt: string | null;
   dexId: string | null;
   quoteSymbol: string | null;
+}
+
+export interface RankedMomentumRow {
+  mint: string;
+  symbol: string | null;
+  totalScore: number;
+  trendDirection: "bullish" | "bearish" | "neutral";
+  momentumAccelerating: boolean;
+  volumeAccelerating: boolean;
+  buyPressureDominant: boolean;
+  txAccelerating: boolean;
+  buySellRatio: number | null;
+  priceImpactPct: number | null;
+  liquidityUsd: number | null;
+  tradeStatus: "watching" | "signal" | "entered" | "rejected";
+  rejectionReason: string | null;
+  checkedAt: string;
 }
 
 export interface SecurityFinding {
@@ -251,6 +276,7 @@ export const api = {
   blockToken: (mint: string) => post(`/watchlist/${mint}/block`),
   unblockToken: (mint: string) => post(`/watchlist/${mint}/unblock`),
   discoverTokens: () => post<{ added: number; candidates: number }>("/tokens/discover"),
+  tokenRanking: () => get<RankedMomentumRow[]>("/tokens/ranking"),
 
   listPositions: (mode?: "paper" | "live") => get<Position[]>(`/positions${mode ? `?mode=${mode}` : ""}`),
   sellPosition: (id: string, percentage: number) => post(`/positions/${id}/sell`, { percentage }),
@@ -673,7 +699,20 @@ export interface ArbTrade {
   createdAt: string;
 }
 
-export type ProviderId = "dexscreener" | "solanaRpc" | "jupiter" | "helius" | "bybit" | "fearGreed" | "binance" | "okx" | "kucoin" | "gateio" | "mexc";
+export type ProviderId =
+  | "dexscreener"
+  | "solanaRpc"
+  | "jupiter"
+  | "jupiterPrice"
+  | "birdeye"
+  | "helius"
+  | "bybit"
+  | "fearGreed"
+  | "binance"
+  | "okx"
+  | "kucoin"
+  | "gateio"
+  | "mexc";
 
 export interface ProviderHealth {
   provider: ProviderId;

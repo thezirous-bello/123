@@ -65,10 +65,20 @@ CREATE TABLE IF NOT EXISTS token_snapshots (
   fdv_usd TEXT,
   volume_5m_usd TEXT,
   volume_1h_usd TEXT,
+  volume_6h_usd TEXT,
+  volume_24h_usd TEXT,
   price_change_5m_pct TEXT,
   price_change_1h_pct TEXT,
+  price_change_6h_pct TEXT,
+  price_change_24h_pct TEXT,
   buys_5m INTEGER,
   sells_5m INTEGER,
+  buys_1h INTEGER,
+  sells_1h INTEGER,
+  buys_6h INTEGER,
+  sells_6h INTEGER,
+  buys_24h INTEGER,
+  sells_24h INTEGER,
   pair_created_at TEXT,
   dex_id TEXT,
   pair_address TEXT,
@@ -78,6 +88,39 @@ CREATE TABLE IF NOT EXISTS token_snapshots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_token_snapshots_mint ON token_snapshots (mint, fetched_at);
+
+-- Momentum score computed at each scan (discovery pass or open-position
+-- monitoring), independent of security_checks (risk, not opportunity).
+-- Backs the live ranked opportunity table and the audit trail of what the
+-- bot saw and decided for every candidate, not just the ones it traded.
+CREATE TABLE IF NOT EXISTS momentum_scores (
+  id TEXT PRIMARY KEY,
+  mint TEXT NOT NULL,
+  symbol TEXT,
+  total_score REAL NOT NULL,
+  price_momentum_score REAL NOT NULL,
+  volume_acceleration_score REAL NOT NULL,
+  buy_pressure_score REAL NOT NULL,
+  tx_acceleration_score REAL NOT NULL,
+  liquidity_quality_score REAL NOT NULL,
+  trend_strength_score REAL NOT NULL,
+  execution_quality_score REAL,
+  trend_direction TEXT NOT NULL CHECK (trend_direction IN ('bullish', 'bearish', 'neutral')),
+  momentum_accelerating INTEGER NOT NULL DEFAULT 0,
+  exhaustion_warning INTEGER NOT NULL DEFAULT 0,
+  volume_accelerating INTEGER NOT NULL DEFAULT 0,
+  buy_pressure_dominant INTEGER NOT NULL DEFAULT 0,
+  tx_accelerating INTEGER NOT NULL DEFAULT 0,
+  buy_sell_ratio REAL,
+  price_impact_pct REAL,
+  liquidity_usd REAL,
+  trade_status TEXT NOT NULL CHECK (trade_status IN ('watching', 'signal', 'entered', 'rejected')),
+  rejection_reason TEXT,
+  checked_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_momentum_scores_mint ON momentum_scores (mint, checked_at);
+CREATE INDEX IF NOT EXISTS idx_momentum_scores_checked ON momentum_scores (checked_at);
 
 CREATE TABLE IF NOT EXISTS security_checks (
   id TEXT PRIMARY KEY,
@@ -122,6 +165,7 @@ CREATE TABLE IF NOT EXISTS positions (
   take_profits_filled_json TEXT NOT NULL DEFAULT '[]',
   trailing_stop_percentage TEXT,
   trailing_stop_high_usd TEXT,
+  lowest_price_seen_usd TEXT,
   max_holding_period_minutes INTEGER,
   entry_reason_json TEXT NOT NULL DEFAULT '{}',
   entry_tx_signature TEXT,

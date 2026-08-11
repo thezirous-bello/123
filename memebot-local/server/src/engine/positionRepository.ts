@@ -22,6 +22,10 @@ export interface Position {
   takeProfitsFilled: number[];
   trailingStopPercentage: number | null;
   trailingStopHighUsd: Decimal | null;
+  /** Low-water mark since entry — MFE/MAE (max favorable/adverse
+   * excursion) tracking. Updated every monitoring tick regardless of
+   * whether a trailing stop is configured, same as trailingStopHighUsd. */
+  lowestPriceSeenUsd: Decimal | null;
   maxHoldingPeriodMinutes: number | null;
   entryReason: Record<string, unknown>;
   entryTxSignature: string | null;
@@ -50,6 +54,7 @@ function rowToPosition(row: Record<string, unknown>): Position {
     takeProfitsFilled: JSON.parse(row.take_profits_filled_json as string),
     trailingStopPercentage: row.trailing_stop_percentage !== null ? Number(row.trailing_stop_percentage) : null,
     trailingStopHighUsd: row.trailing_stop_high_usd !== null ? new Decimal(row.trailing_stop_high_usd as string) : null,
+    lowestPriceSeenUsd: row.lowest_price_seen_usd !== null && row.lowest_price_seen_usd !== undefined ? new Decimal(row.lowest_price_seen_usd as string) : null,
     maxHoldingPeriodMinutes: row.max_holding_period_minutes !== null ? Number(row.max_holding_period_minutes) : null,
     entryReason: JSON.parse((row.entry_reason_json as string) ?? "{}"),
     entryTxSignature: (row.entry_tx_signature as string) ?? null,
@@ -110,9 +115,9 @@ export function createPosition(params: CreatePositionParams): Position {
     `INSERT INTO positions (
       id, mint, symbol, decimals, mode, status, strategy_id, entry_price_usd, entry_amount_usd, token_amount,
       remaining_token_amount, cost_basis_usd, stop_loss_percentage, take_profits_json, take_profits_filled_json,
-      trailing_stop_percentage, trailing_stop_high_usd, max_holding_period_minutes, entry_reason_json,
+      trailing_stop_percentage, trailing_stop_high_usd, lowest_price_seen_usd, max_holding_period_minutes, entry_reason_json,
       entry_tx_signature, realized_pnl_usd, opened_at
-    ) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?, '0', ?)`,
+    ) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, ?, ?, ?, ?, '0', ?)`,
   ).run(
     id,
     params.mint,
@@ -128,6 +133,7 @@ export function createPosition(params: CreatePositionParams): Position {
     params.stopLossPercentage,
     JSON.stringify(params.takeProfits),
     params.trailingStopPercentage,
+    params.entryPriceUsd.toFixed(),
     params.entryPriceUsd.toFixed(),
     params.maxHoldingPeriodMinutes,
     JSON.stringify(params.entryReason),
@@ -190,12 +196,21 @@ export function applyExit(id: string, params: ApplyExitParams): Position {
   return updated;
 }
 
-export function updateTrailingHigh(id: string, priceUsd: Decimal): void {
+/** Updates both watermarks used for trailing-stop and MFE/MAE tracking:
+ * the high (trailing-stop reference + max favorable excursion) and the low
+ * (max adverse excursion). Always called every monitoring tick regardless
+ * of whether a trailing stop is configured, so MFE/MAE stay accurate even
+ * for positions that only use a fixed stop-loss/take-profit plan. */
+export function updatePriceExtremes(id: string, priceUsd: Decimal): void {
   const position = getPosition(id);
   if (!position) return;
   const currentHigh = position.trailingStopHighUsd ?? position.entryPriceUsd;
+  const currentLow = position.lowestPriceSeenUsd ?? position.entryPriceUsd;
   if (priceUsd.gt(currentHigh)) {
     db.prepare("UPDATE positions SET trailing_stop_high_usd = ? WHERE id = ?").run(priceUsd.toFixed(), id);
+  }
+  if (priceUsd.lt(currentLow)) {
+    db.prepare("UPDATE positions SET lowest_price_seen_usd = ? WHERE id = ?").run(priceUsd.toFixed(), id);
   }
 }
 

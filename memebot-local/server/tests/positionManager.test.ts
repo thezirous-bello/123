@@ -1,7 +1,36 @@
 import { describe, expect, it } from "vitest";
 import { Decimal } from "../src/lib/decimal.js";
 import { evaluateExitAction, resolveSellTokenAmount } from "../src/engine/positionManager.js";
+import { MomentumConfigSchema } from "../src/lib/settings.js";
+import type { MomentumScoreResult } from "../src/market/momentum.js";
 import type { Position } from "../src/engine/positionRepository.js";
+
+const defaultMomentumConfig = MomentumConfigSchema.parse({});
+
+function makeMomentum(overrides: Partial<MomentumScoreResult> = {}): MomentumScoreResult {
+  return {
+    totalScore: 75,
+    components: {
+      priceMomentum: 75,
+      volumeAcceleration: 75,
+      buyPressure: 75,
+      txAcceleration: 75,
+      liquidityQuality: 75,
+      trendStrength: 75,
+      executionQuality: 75,
+    },
+    trendDirection: "bullish",
+    momentumAccelerating: true,
+    exhaustionWarning: false,
+    volumeAccelerating: true,
+    buyPressureDominant: true,
+    txAccelerating: true,
+    buySellRatio: 0.7,
+    distanceFromHighPct: 0,
+    reasons: [],
+    ...overrides,
+  };
+}
 
 function makePosition(overrides: Partial<Position> = {}): Position {
   return {
@@ -25,6 +54,7 @@ function makePosition(overrides: Partial<Position> = {}): Position {
     takeProfitsFilled: [],
     trailingStopPercentage: null,
     trailingStopHighUsd: null,
+    lowestPriceSeenUsd: null,
     maxHoldingPeriodMinutes: null,
     entryReason: {},
     entryTxSignature: null,
@@ -112,6 +142,50 @@ describe("evaluateExitAction — max holding period", () => {
     });
     const action = evaluateExitAction(position, new Decimal(1.0));
     expect(action).toEqual({ reason: "max_holding_period", sellPercentageOfOriginal: 100 });
+  });
+});
+
+describe("evaluateExitAction — dynamic momentum exits", () => {
+  it("does not consider momentum at all when it isn't supplied (existing 2-arg call sites keep working)", () => {
+    const position = makePosition({ stopLossPercentage: null, takeProfits: [], trailingStopPercentage: null });
+    const action = evaluateExitAction(position, new Decimal(1.5)); // +50%, no exit rule would fire without momentum
+    expect(action).toBeNull();
+  });
+
+  it("exits a profitable position on momentum reversal once the score drops below the exit threshold and trend is no longer bullish", () => {
+    const position = makePosition({ stopLossPercentage: null, takeProfits: [], trailingStopPercentage: null });
+    const momentum = makeMomentum({ totalScore: 20, trendDirection: "bearish" });
+    const action = evaluateExitAction(position, new Decimal(1.2), new Date(), momentum, defaultMomentumConfig); // +20%, profitable
+    expect(action).toEqual({ reason: "momentum_reversal", sellPercentageOfOriginal: 100 });
+  });
+
+  it("does not exit on momentum reversal while the position is not yet profitable — stop loss owns the downside", () => {
+    const position = makePosition({ stopLossPercentage: 50, takeProfits: [], trailingStopPercentage: null });
+    const momentum = makeMomentum({ totalScore: 10, trendDirection: "bearish" });
+    const action = evaluateExitAction(position, new Decimal(0.95), new Date(), momentum, defaultMomentumConfig); // -5%, not profitable
+    expect(action).toBeNull();
+  });
+
+  it("does not exit a strong winner just because momentum is still healthy — lets it keep running", () => {
+    const position = makePosition({ stopLossPercentage: null, takeProfits: [], trailingStopPercentage: null });
+    const momentum = makeMomentum({ totalScore: 85, trendDirection: "bullish" });
+    const action = evaluateExitAction(position, new Decimal(2.0), new Date(), momentum, defaultMomentumConfig); // +100%
+    expect(action).toBeNull();
+  });
+
+  it("exits on sell-pressure reversal once sells clearly dominate buys on a profitable position", () => {
+    const position = makePosition({ stopLossPercentage: null, takeProfits: [], trailingStopPercentage: null });
+    // buySellRatio 0.2 -> sellRatio 0.8, above the default 0.65 threshold.
+    const momentum = makeMomentum({ totalScore: 80, trendDirection: "bullish", buySellRatio: 0.2 });
+    const action = evaluateExitAction(position, new Decimal(1.3), new Date(), momentum, defaultMomentumConfig);
+    expect(action).toEqual({ reason: "sell_pressure_reversal", sellPercentageOfOriginal: 100 });
+  });
+
+  it("stop loss still takes priority over a momentum-reversal signal", () => {
+    const position = makePosition({ stopLossPercentage: 20, takeProfits: [], trailingStopPercentage: null });
+    const momentum = makeMomentum({ totalScore: 10, trendDirection: "bearish" });
+    const action = evaluateExitAction(position, new Decimal(0.79), new Date(), momentum, defaultMomentumConfig); // -21%
+    expect(action?.reason).toBe("stop_loss");
   });
 });
 

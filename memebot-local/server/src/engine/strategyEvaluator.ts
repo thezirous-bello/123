@@ -1,6 +1,8 @@
 import type { SecurityReport } from "../security/tokenSecurity.js";
 import type { TokenSnapshot } from "../market/types.js";
 import { tokenAgeMinutes } from "../market/snapshotService.js";
+import type { MomentumScoreResult } from "../market/momentum.js";
+import type { MomentumConfig } from "../lib/settings.js";
 import type { StrategyRules } from "../strategy/schema.js";
 
 export interface EntryCondition {
@@ -150,6 +152,67 @@ export function evaluateEntryConditions(
   }
 
   return { passed: conditions.every((c) => c.passed), conditions };
+}
+
+/**
+ * The core of the "don't randomly trade meme coins" objective: multiple
+ * independent momentum confirmations, not just a large historical
+ * percentage gain. Every threshold falls back to the account-level
+ * momentum config when the strategy doesn't set its own (see schema.ts) —
+ * so this always applies real gating, never silently skips it because a
+ * field happened to be unset.
+ */
+export function evaluateMomentumConditions(
+  rules: StrategyRules,
+  config: MomentumConfig,
+  momentum: MomentumScoreResult,
+): EntryCondition[] {
+  const conditions: EntryCondition[] = [];
+
+  const minScore = rules.minimumMomentumScore ?? config.minMomentumScoreToEnter;
+  conditions.push(
+    cond(
+      "momentum_score",
+      momentum.totalScore >= minScore,
+      `Momentum score ${momentum.totalScore.toFixed(1)}/100 vs required >= ${minScore}. Drivers: ${momentum.reasons.slice(0, 3).join(" ") || "insufficient data"}`,
+    ),
+  );
+
+  const requireTrendBullish = rules.requireTrendBullish ?? config.requireTrendBullish;
+  if (requireTrendBullish) {
+    conditions.push(cond("trend_bullish", momentum.trendDirection === "bullish", `Short-term trend is "${momentum.trendDirection}", required bullish.`));
+  }
+
+  const requireVolumeAccelerating = rules.requireVolumeAccelerating ?? config.requireVolumeAccelerating;
+  if (requireVolumeAccelerating) {
+    conditions.push(cond("volume_accelerating", momentum.volumeAccelerating, `Volume accelerating: ${momentum.volumeAccelerating}.`));
+  }
+
+  const requireBuyPressureDominant = rules.requireBuyPressureDominant ?? config.requireBuyPressureDominant;
+  if (requireBuyPressureDominant) {
+    conditions.push(
+      cond(
+        "buy_pressure_dominant",
+        momentum.buyPressureDominant,
+        `Buy pressure dominant: ${momentum.buyPressureDominant} (buy ratio ${momentum.buySellRatio !== null ? `${(momentum.buySellRatio * 100).toFixed(0)}%` : "unknown"}).`,
+      ),
+    );
+  }
+
+  const requireTxAccelerating = rules.requireTxAccelerating ?? config.requireTxAccelerating;
+  if (requireTxAccelerating) {
+    conditions.push(cond("tx_accelerating", momentum.txAccelerating, `Transaction activity accelerating: ${momentum.txAccelerating}.`));
+  }
+
+  // A single isolated giant candle with no acceleration confirmation and no
+  // trend agreement across timeframes is exactly the "chasing a dead pump"
+  // pattern this bot must avoid — block it even if the raw score cleared
+  // the bar on the strength of one big cumulative window alone.
+  if (momentum.exhaustionWarning) {
+    conditions.push(cond("not_exhausted", false, "Momentum shows exhaustion — large cumulative gain but the most recent segment has stalled or reversed."));
+  }
+
+  return conditions;
 }
 
 /** Holder-concentration condition is evaluated separately from the report

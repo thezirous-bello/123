@@ -111,6 +111,19 @@ Click **Parse Strategy**. You'll see the structured rules translated back into p
 
 If your instruction is unsafe or unbounded — "use my whole wallet," "buy anything trending," "ignore safety checks" — it will be rejected with the exact reason, not silently reinterpreted.
 
+## 7b. Momentum scanning & scoring
+
+The bot doesn't just filter tokens on liquidity/age/holder concentration — it continuously scores every watched token's **momentum** from 0-100 and only signals an entry once several independent confirmations agree, so it targets tokens whose upward move is still strengthening rather than a large historical percentage gain that's already dying out.
+
+The score blends seven weighted components computed from real market data (DexScreener price/volume/txn windows across 5m/1h/6h/24h, plus 1m/15m windows this app derives from its own stored price history since no free provider exposes those directly, an optional Jupiter-price fallback when a token has no DexScreener pair yet, and optional Birdeye enrichment if you set `BIRDEYE_API_KEY`):
+
+- **Price momentum** — recent direction plus whether the pace is accelerating (e.g. a recent window moving faster than the longer-run average) or decelerating/exhausted (a large cumulative gain that has clearly stalled — the "don't become exit liquidity" check)
+- **Volume acceleration**, **buy pressure** (buy/sell ratio), **transaction acceleration**, **liquidity quality**, **trend strength** (agreement across timeframes), and **execution quality** (price impact from a real Jupiter quote)
+
+Any component whose underlying data isn't available is left out of the score entirely (weights renormalize over what's left) — nothing is ever fabricated. Weights and entry/exit thresholds are configurable via `PATCH /api/momentum/config` (defaults live in `server/src/lib/settings.ts`); a strategy can override the entry thresholds it uses (`minimumMomentumScore`, `requireVolumeAccelerating`, etc. in the Strategy tab's rule editor) but falls back to the account-wide defaults when it doesn't.
+
+Exits aren't just a fixed take-profit either: alongside stop loss/take-profit/trailing-stop/max-holding-period, a profitable position can also close on **momentum reversal** (score has dropped below the exit threshold and the trend is no longer bullish) or **sell-pressure reversal** (sells have clearly taken over) — so a strong winner keeps running while its momentum holds up, instead of getting closed the instant it retraces. The **Scanner** tab's watchlist table is sorted by this opportunity score (not raw 24h gain) and shows trend, volume-acceleration, buy/sell ratio, liquidity, and trade status for every token the bot has looked at — including ones it rejected and why.
+
 ## 8. Use paper trading
 
 Paper trading is the default and is always available, with no wallet required. Click **Start Bot** on the Dashboard (or Strategy) tab. With an active strategy, the bot polls token data on an interval, runs the same security and risk checks a live trade would use, and — in paper mode — simulates the fill (using a real Jupiter quote for realistic pricing, plus simulated network/priority fees and slippage) instead of sending a real transaction. Watch **Positions** and **History** fill in as it runs, and check **Dashboard** for realized/unrealized PnL, win rate, and other stats.
@@ -162,7 +175,8 @@ memebot-local/
     src/
       db/            SQLite schema + migrations
       strategy/      NL parser, Zod schema, validator, AI-assisted parsing
-      market/        DexScreener + on-chain (Solana RPC) data adapters
+      market/        DexScreener + Jupiter-price + Birdeye + on-chain (Solana
+                       RPC) data adapters, and the momentum scoring engine
       security/      Token risk/security analysis
       jupiter/        Quote + swap execution against Jupiter
       engine/         Risk engine, paper engine, live engine, position manager,
@@ -179,7 +193,7 @@ memebot-local/
 npm run test
 ```
 
-Covers: natural-language strategy parsing (including rejecting unsafe/unbounded instructions), Zod schema validation and global-limit clamping, position sizing, stop loss/take-profit/trailing-stop logic, risk engine checks (max trade size, max open positions, daily loss limit, emergency stop, live-trading-disabled gate, critical-risk blocking), token security scoring, Jupiter quote validation, paper-trade execution and PnL, and duplicate-order prevention via idempotency keys.
+Covers: natural-language strategy parsing (including rejecting unsafe/unbounded instructions), Zod schema validation and global-limit clamping, position sizing, stop loss/take-profit/momentum-reversal/sell-pressure-reversal/trailing-stop logic, momentum scoring (acceleration vs. exhaustion detection, component renormalization when data is missing), risk engine checks (max trade size, max open positions, daily loss limit, emergency stop, live-trading-disabled gate, critical-risk blocking), token security scoring, Jupiter quote validation, paper-trade execution and PnL, and duplicate-order prevention via idempotency keys.
 
 ## What's simulated vs. real in paper mode
 
