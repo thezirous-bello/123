@@ -339,6 +339,7 @@ export const api = {
   arbWallet: () => get<ArbWallet>("/arb/wallet"),
   arbConfig: () => get<ArbStrategyConfig>("/arb/config"),
   updateArbConfig: (patchBody: Partial<ArbStrategyConfig>) => patch<ArbStrategyConfig>("/arb/config", patchBody),
+  arbDefaultSymbols: () => get<string[]>("/arb/config/default-symbols"),
   arbStart: () => post("/arb/control/start"),
   arbStop: () => post("/arb/control/stop"),
   arbEmergencyStop: (reason: string) => post("/arb/control/emergency-stop", { reason }),

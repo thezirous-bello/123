@@ -316,11 +316,23 @@ function OpportunityRow({ opportunity }: { opportunity: ArbOpportunity }) {
 function ConfigEditor({ config, busy, onSave }: { config: ArbStrategyConfig; busy: boolean; onSave: (patch: Partial<ArbStrategyConfig>) => void }) {
   const [draft, setDraft] = useState(config);
   const [symbolsText, setSymbolsText] = useState(config.symbols.join(","));
+  const [loadingDefaults, setLoadingDefaults] = useState(false);
 
   useEffect(() => {
     setDraft(config);
     setSymbolsText(config.symbols.join(","));
   }, [config]);
+
+  async function loadRecommendedSymbols() {
+    setLoadingDefaults(true);
+    try {
+      const symbols = await api.arbDefaultSymbols();
+      setSymbolsText(symbols.join(","));
+      setDraft((d) => ({ ...d, symbols }));
+    } finally {
+      setLoadingDefaults(false);
+    }
+  }
 
   function field<K extends keyof ArbStrategyConfig>(key: K, label: string, step = 0.01) {
     const value = draft[key];
@@ -364,14 +376,25 @@ function ConfigEditor({ config, busy, onSave }: { config: ArbStrategyConfig; bus
       </div>
 
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">Coins (comma-separated base symbols, e.g. BTC,ETH,SOL)</h4>
-        <input
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h4 className="text-xs font-semibold uppercase text-white/50">Coins (comma-separated base symbols, e.g. BTC,ETH,SOL) — {draft.symbols.length} currently</h4>
+          <button
+            type="button"
+            disabled={loadingDefaults}
+            onClick={loadRecommendedSymbols}
+            className="rounded border border-sky-500/40 px-2 py-1 text-[10px] font-mono text-sky-300 hover:bg-sky-500/10 disabled:opacity-40"
+          >
+            {loadingDefaults ? "Loading…" : "Load Recommended (~500) Coins"}
+          </button>
+        </div>
+        <textarea
           value={symbolsText}
           onChange={(e) => {
             setSymbolsText(e.target.value);
             setDraft({ ...draft, symbols: e.target.value.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean) });
           }}
-          className="w-full rounded-md border border-white/15 bg-black/30 px-2 py-1 text-sm font-mono outline-none focus:border-sky-500"
+          rows={4}
+          className="w-full resize-y rounded-md border border-white/15 bg-black/30 px-2 py-1 text-sm font-mono outline-none focus:border-sky-500"
         />
       </div>
 

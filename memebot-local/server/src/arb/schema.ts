@@ -10,34 +10,78 @@ import { ALL_EXCHANGE_IDS } from "./exchanges/index.js";
 // than wiring up real cross-exchange execution.
 const ExchangeIdSchema = z.enum(ALL_EXCHANGE_IDS as [ExchangeId, ...ExchangeId[]]);
 
+// ~500 real coin tickers spanning majors, L1/L2s, DeFi, oracles/infra,
+// gaming/metaverse, AI/DePIN, meme, exchange tokens, privacy, RWA/payments,
+// staking derivatives, and several exchange-specific ecosystems (Cosmos,
+// Polkadot, BSC, Solana) — deduplicated (case-insensitive) at build time, see
+// the superRefine check below which would otherwise reject a duplicate. A
+// symbol missing on a given exchange just doesn't get a quote there for that
+// scan (see findBestOpportunity), so this list can safely run far wider than
+// any one exchange's actual overlap — the point is maximum coverage of
+// cross-listed pairs, not that every symbol here trades everywhere. Every
+// extra symbol costs nothing extra network-wise: each exchange's adapter is
+// one "all tickers" call regardless of list size, only the in-memory Map
+// lookups scale with it.
+export const DEFAULT_ARB_SYMBOLS: string[] = [
+  "BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DOT",
+  "LTC", "BCH", "TRX", "MATIC", "POL", "UNI", "ATOM", "APT", "ARB", "OP",
+  "ICP", "FIL", "ETC", "XLM", "HBAR", "VET", "ALGO", "AAVE", "MKR", "GRT",
+  "NEAR", "SUI", "SEI", "TIA", "INJ", "KAS", "TON", "EGLD", "FLOW", "ZIL",
+  "ONE", "NEO", "WAVES", "QTUM", "IOTA", "XTZ", "EOS", "ROSE", "CELO", "KAVA",
+  "FTM", "S", "STRK", "ZK", "MANTA", "METIS", "BLAST", "MODE", "SCRT", "CANTO",
+  "KDA", "ELF", "ONT", "ICX", "ZRX", "LSK", "ARDR", "STEEM", "SC", "DGB",
+  "RVN", "NANO", "XEM", "BTS", "STRAX", "ARK", "SYS", "NULS", "WAN", "SXP",
+  "CRV", "SNX", "COMP", "YFI", "SUSHI", "BAL", "1INCH", "LDO", "RPL", "FXS",
+  "GMX", "DYDX", "CVX", "PENDLE", "RDNT", "JOE", "SPELL", "ALPHA", "BADGER", "RUNE",
+  "OSMO", "PERP", "DODO", "BNT", "KNC", "REN", "STG", "GNS", "GAINS", "VELO",
+  "AERO", "RAY", "ORCA", "JTO", "JUP", "PYTH", "DRIFT", "MNGO", "SRM", "CAKE",
+  "BAKE", "BURGER", "AUTO", "BEL", "LINA", "TWT", "XVS", "ALPACA", "MDX", "API3",
+  "BAND", "TRB", "UMA", "DIA", "FLUX", "ANKR", "RENDER", "AR", "STORJ", "OCEAN",
+  "FET", "AGIX", "NMR", "CTXC", "AKT", "GLM", "HNT", "IOTX", "MOBILE", "IOT",
+  "RSS3", "POKT", "THETA", "TFUEL", "LPT", "STX", "SAND", "MANA", "AXS", "GALA",
+  "IMX", "ENJ", "CHZ", "ILV", "YGG", "GHST", "ALICE", "TLM", "SLP", "PYR",
+  "UOS", "REVV", "SUPER", "VOXEL", "MAGIC", "GODS", "PRIME", "BIGTIME", "PIXEL", "PORTAL",
+  "XAI", "NAKA", "ACE", "BEAM", "RON", "MAVIA", "TAO", "NFP", "AI", "ARKM",
+  "WLD", "GRASS", "IO", "PROMPT", "AIOZ", "NOS", "PHB", "SHIB", "PEPE", "WIF",
+  "BONK", "FLOKI", "BOME", "MEME", "MEW", "POPCAT", "BRETT", "TURBO", "MOG", "NEIRO",
+  "PNUT", "GOAT", "ACT", "MOODENG", "CHILLGUY", "AI16Z", "PENGU", "SPX", "FARTCOIN", "GIGA",
+  "BABYDOGE", "ELON", "SAMO", "MYRO", "WOJAK", "LADYS", "OKB", "HT", "KCS", "GT",
+  "MX", "LEO", "CRO", "FTT", "WOO", "BGB", "BMX", "COIN", "NEXO", "CEL",
+  "XMR", "ZEC", "DASH", "GRIN", "ARRR", "FIRO", "XVG", "ONDO", "XDC", "RIO",
+  "POLYX", "TRU", "CFG", "MPL", "GFI", "PAXG", "XAUT", "QNT", "RLC", "ANT",
+  "REQ", "UTK", "DUSK", "SD", "PSTAKE", "STMATIC", "SWETH", "ETHFI", "RETH", "BSV",
+  "DCR", "ZEN", "KMD", "PIVX", "NAV", "VTC", "GRS", "BTG", "W", "ENA",
+  "REZ", "OMNI", "SAGA", "TNSR", "ZRO", "DYM", "ALT", "AEVO", "MERL", "BB",
+  "NOT", "CATI", "HMSTR", "DOGS", "PONKE", "SLERF", "ZEUS", "PARCL", "SANTOS", "PORTO",
+  "LAZIO", "USUAL", "ME", "MORPHO", "SYRUP", "SCR", "ORDI", "SATS", "1000SATS", "RATS",
+  "CKB", "TAIKO", "SAFE", "PARTI", "BIO", "COOKIE", "KAITO", "HOT", "WAXP", "TLOS",
+  "HIVE", "CTC", "MTL", "POWR", "AGLD", "HIGH", "RARE", "LOOKS", "BLUR", "X2Y2",
+  "SUDO", "NFTX", "WHALE", "DAR", "MOVR", "GLMR", "ASTR", "ACA", "KAR", "PHA",
+  "CFX", "KLAY", "XPRT", "JASMY", "CVC", "OXT", "POLY", "FUN", "DENT", "WIN",
+  "BTT", "SUN", "NFT", "JST", "REEF", "COTI", "CELR", "OGN", "SKL", "JUNO",
+  "REGEN", "STARS", "CRE", "DVPN", "IRIS", "SOMM", "UMEE", "KUJI", "GRAV", "AXL",
+  "STRD", "CMDX", "PARA", "EFI", "INTR", "BNC", "KILT", "UNQ", "RING", "PDEX",
+  "CRU", "AIR", "MGX", "SFP", "TKO", "FRONT", "ALPINE", "CITY", "PSG", "JUV",
+  "STEP", "MEDIA", "PORT", "COPE", "SLND", "TULIP", "SUNNY", "SBR", "ATLAS", "POLIS",
+  "WOOF", "GENE", "GST", "GMT", "SHDW", "HONEY", "PRISM", "MANEKI", "RETARDIO", "GRIFFAIN",
+  "ZEREBRO", "BAR", "ATM", "ASR", "ACM", "POLYS", "AZUR", "OG", "SOCIOS", "CORE",
+  "AVAIL", "FUEL", "SOON", "MOVE", "INIT", "HYPE", "PUMP", "BOOK", "HARAMBE", "MICHI",
+  "CAT", "SUNDOG", "DOG", "TOSHI", "DEGEN", "HIGHER", "NORMIE", "KEYCAT", "APU", "PEIPEI",
+  "PEEZY", "SIGMA", "GIGACHAD", "RADIANT", "SILO", "EULER", "IPOR", "TERM", "NOTIONAL", "FLUID",
+  "CLEARPOOL", "MAPLE", "GOLDFINCH", "CENTRIFUGE", "TRUEFI", "IOST", "WAX", "TOMO", "STMX", "CTSI",
+  "MASK", "LRC", "ENS", "APE", "LOOM", "STPT", "PERL", "ORN", "FOR", "VITE",
+  "MTA", "MITH", "KEY", "WING", "TCT", "DATA", "MDT", "AUCTION", "IDEX", "DEXE",
+  "PROS", "TVK", "ERN", "PUNDIX", "BOND", "FIDA", "MLN", "NKN", "OAX", "PNT",
+  "QUICK", "RAD", "TORN", "UFT", "VGX", "WNXM", "XNO", "ZKS", "ARPA", "BLZ",
+  "CTK", "DEGO", "EPX",
+];
+
 export const ArbStrategyConfigObjectSchema = z
   .object({
     enabled: z.boolean().default(false),
 
     exchanges: z.array(ExchangeIdSchema).min(2).default(["binance", "bybit", "okx", "kucoin", "gateio", "mexc"]),
-    // ~100 of the most liquid coins, cross-listed with USDT pairs on
-    // essentially every exchange above — a symbol missing on a given
-    // exchange just doesn't get a quote there for that scan (see
-    // findBestOpportunity), so this list can safely run wider than any one
-    // exchange's actual overlap. Every extra symbol here costs nothing
-    // extra network-wise: each exchange's adapter is one "all tickers" call
-    // regardless of how many symbols this list has, only the in-memory
-    // Map lookups scale with it.
-    symbols: z
-      .array(z.string())
-      .min(1)
-      .default([
-        "BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DOT",
-        "LTC", "BCH", "TRX", "MATIC", "UNI", "ATOM", "NEAR", "APT", "ARB", "OP",
-        "ICP", "FIL", "ETC", "XLM", "HBAR", "VET", "ALGO", "AAVE", "MKR", "GRT",
-        "SAND", "MANA", "AXS", "EOS", "XTZ", "THETA", "FTM", "EGLD", "FLOW", "CHZ",
-        "KAVA", "ZEC", "DASH", "COMP", "SNX", "CRV", "YFI", "ENJ", "BAT", "ZIL",
-        "ONE", "IOTA", "NEO", "WAVES", "QTUM", "OMG", "ANKR", "CELO", "ROSE", "RUNE",
-        "INJ", "DYDX", "GMX", "LDO", "RPL", "FXS", "PEPE", "SHIB", "WIF", "BONK",
-        "FLOKI", "SUI", "SEI", "TIA", "JTO", "JUP", "PYTH", "STRK", "W", "ENA",
-        "ONDO", "ORDI", "TAO", "RENDER", "FET", "AGIX", "OCEAN", "IMX", "GALA", "MASK",
-        "LRC", "1INCH", "SUSHI", "BAL", "KSM", "ZRX", "STORJ", "SKL", "CTSI", "BNT",
-      ]),
+    symbols: z.array(z.string()).min(1).default(DEFAULT_ARB_SYMBOLS),
 
     scanIntervalSeconds: z.number().gt(0).default(10),
     positionSizeUsd: z.number().gt(0).default(500),

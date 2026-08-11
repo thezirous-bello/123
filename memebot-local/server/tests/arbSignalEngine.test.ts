@@ -1,7 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { findBestOpportunity, scanAllSymbols } from "../src/arb/signalEngine.js";
-import { ArbStrategyConfigSchema } from "../src/arb/schema.js";
+import { ArbStrategyConfigSchema, DEFAULT_ARB_SYMBOLS } from "../src/arb/schema.js";
 import type { ExchangeId, TickerQuote } from "../src/arb/exchanges/index.js";
+
+describe("DEFAULT_ARB_SYMBOLS", () => {
+  it("has no duplicate symbols (case-insensitive) — a duplicate would fail schema validation", () => {
+    const upper = DEFAULT_ARB_SYMBOLS.map((s) => s.toUpperCase());
+    expect(new Set(upper).size).toBe(upper.length);
+  });
+
+  it("is a wide default watchlist (~500 coins)", () => {
+    expect(DEFAULT_ARB_SYMBOLS.length).toBeGreaterThanOrEqual(400);
+  });
+
+  it("parses successfully as the schema default (exercises the superRefine duplicate check for real)", () => {
+    const result = ArbStrategyConfigSchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.symbols.length).toBe(DEFAULT_ARB_SYMBOLS.length);
+  });
+});
 
 function tickers(entries: Array<[ExchangeId, string, TickerQuote]>): Map<ExchangeId, Map<string, TickerQuote>> {
   const out = new Map<ExchangeId, Map<string, TickerQuote>>();
