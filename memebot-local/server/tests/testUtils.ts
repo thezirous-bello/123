@@ -4,6 +4,7 @@ const TABLES = [
   "trades",
   "positions",
   "security_checks",
+  "momentum_scores",
   "token_snapshots",
   "watchlist",
   "strategy_versions",

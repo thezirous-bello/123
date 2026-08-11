@@ -29,7 +29,30 @@ function ensureColumn(table: string, column: string, definition: string) {
   }
 }
 
+/** Self-heals a momentum_scores table created by an earlier, broken version
+ * of this migration that incorrectly marked several legitimately-nullable
+ * score columns NOT NULL — computeMomentumScore() deliberately returns null
+ * for any component whose underlying market data is unavailable (common:
+ * e.g. no liquidity figure, or no buy/sell transaction counts), so every
+ * insert into that broken table threw, which aborted the entire concurrent
+ * scan batch and made the bot appear to "scan a couple tokens and pause."
+ * `CREATE TABLE IF NOT EXISTS` below is a no-op against an existing
+ * (broken) table, so this has to run first. The table is a rolling
+ * diagnostic/audit log regenerated every scan — dropping and letting it get
+ * recreated with the corrected schema loses nothing of lasting value. */
+function fixBrokenMomentumScoresSchema() {
+  const exists = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'momentum_scores'").get();
+  if (!exists) return;
+  const columns = db.prepare("PRAGMA table_info(momentum_scores)").all() as Array<{ name: string; notnull: number }>;
+  const brokenColumn = columns.find((c) => c.name === "price_momentum_score" && c.notnull === 1);
+  if (brokenColumn) {
+    db.exec("DROP TABLE momentum_scores");
+    logger.warn("Recreating momentum_scores table — an earlier version incorrectly blocked scanning by requiring columns that are legitimately nullable.");
+  }
+}
+
 function runMigrations() {
+  fixBrokenMomentumScoresSchema();
   const sql = readFileSync(join(__dirname, "migrations.sql"), "utf-8");
   db.exec(sql);
 

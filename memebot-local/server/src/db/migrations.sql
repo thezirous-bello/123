@@ -98,12 +98,17 @@ CREATE TABLE IF NOT EXISTS momentum_scores (
   mint TEXT NOT NULL,
   symbol TEXT,
   total_score REAL NOT NULL,
-  price_momentum_score REAL NOT NULL,
-  volume_acceleration_score REAL NOT NULL,
-  buy_pressure_score REAL NOT NULL,
-  tx_acceleration_score REAL NOT NULL,
-  liquidity_quality_score REAL NOT NULL,
-  trend_strength_score REAL NOT NULL,
+  -- Every one of these six is null whenever that component's underlying
+  -- market data isn't available for a given token (common — e.g. no
+  -- liquidity figure, or no buy/sell transaction counts) — computeMomentumScore
+  -- deliberately excludes missing data rather than fabricating a neutral
+  -- value, so these must stay nullable. Do not add NOT NULL back here.
+  price_momentum_score REAL,
+  volume_acceleration_score REAL,
+  buy_pressure_score REAL,
+  tx_acceleration_score REAL,
+  liquidity_quality_score REAL,
+  trend_strength_score REAL,
   execution_quality_score REAL,
   trend_direction TEXT NOT NULL CHECK (trend_direction IN ('bullish', 'bearish', 'neutral')),
   momentum_accelerating INTEGER NOT NULL DEFAULT 0,
