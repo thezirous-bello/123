@@ -40,8 +40,8 @@ function curvePath(from: { x: number; y: number }, to: { x: number; y: number },
   return `M${from.x},${from.y} Q${midX + offsetX},${midY + offsetY} ${to.x},${to.y}`;
 }
 
-const VIEW_W = 1000;
-const VIEW_H = 500;
+const VIEW_W = 1080;
+const VIEW_H = 560;
 const LOCAL = { x: VIEW_W / 2, y: VIEW_H / 2 };
 
 /** Deterministic 0..1 hash of a string, used only for stable per-node
@@ -62,8 +62,8 @@ function radialLayout(services: ServiceNode[]): Array<ServiceNode & { x: number;
   // Separate X/Y radii (not a single circle scaled by a fudge factor) so
   // nodes + their label text stay inside the canvas regardless of its
   // aspect ratio, leaving fixed padding for the label above/below each dot.
-  const radiusX = VIEW_W / 2 - 105;
-  const radiusY = VIEW_H / 2 - 65;
+  const radiusX = VIEW_W / 2 - 110;
+  const radiusY = VIEW_H / 2 - 75;
   return services.map((s, i) => {
     const angle = (2 * Math.PI * i) / n - Math.PI / 2;
     const jitter = (hash01(s.id + i) - 0.5) * 0.16;
@@ -177,7 +177,7 @@ export function NetworkMapPanel({ title = "Network Map", hubLabel, services, act
         </p>
       )}
 
-      <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="mx-auto block w-full max-w-[960px]">
+      <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="block w-full">
         <defs>
           <radialGradient id="hub-glow" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="#FF2D9B" stopOpacity={0.35} />
@@ -323,7 +323,7 @@ const PARTICLE_PALETTE = ["#00FFC8", "#00FFC8", "#00FFC8", "#00E5FF", "#FF2D9B",
  * instead of smooth motion). */
 function useParticleField(serviceCount: number): Particle[] {
   return useMemo(() => {
-    const count = Math.min(260, 120 + serviceCount * 14);
+    const count = Math.min(300, 140 + serviceCount * 16);
     const particles: Particle[] = [];
     for (let i = 0; i < count; i++) {
       particles.push({

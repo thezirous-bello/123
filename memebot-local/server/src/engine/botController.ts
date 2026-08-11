@@ -1,4 +1,4 @@
-import { liveTradingAllowedByConfig } from "../env.js";
+import { env, liveTradingAllowedByConfig } from "../env.js";
 import { Decimal } from "../lib/decimal.js";
 import { recordLog } from "../lib/auditLog.js";
 import { checkSellRoute } from "../jupiter/quote.js";
@@ -140,8 +140,25 @@ async function runTick() {
  * immediately after startup.
  */
 export async function runAutoDiscovery(): Promise<{ added: number; candidates: number; evicted: number }> {
-  const candidates = await discoverTrendingSolanaMints(80);
+  const discovery = await discoverTrendingSolanaMints(80);
+  const candidates = discovery.mints;
+
+  if (!discovery.requestsOk) {
+    // Both feed requests actually failed — this is the case that used to be
+    // completely silent (no log line, no provider-health signal), which is
+    // indistinguishable on the dashboard from "the bot just isn't doing
+    // anything." Surface it loudly: check DEXSCREENER_API_URL reachability,
+    // a firewall/proxy, or a temporary DexScreener outage.
+    recordLog(
+      "warn",
+      "discovery",
+      `DexScreener discovery failed — ${discovery.errors.join("; ")}. Check network connectivity to ${env.DEXSCREENER_API_URL} (firewall/proxy/DNS), or it may be a temporary outage.`,
+    );
+    return { added: 0, candidates: 0, evicted: 0 };
+  }
+
   if (candidates.length === 0) {
+    recordLog("debug", "discovery", "DexScreener discovery reached the API but returned 0 trending tokens this pass — will retry on the next discovery interval.");
     return { added: 0, candidates: 0, evicted: 0 };
   }
 
@@ -179,6 +196,8 @@ export async function runAutoDiscovery(): Promise<{ added: number; candidates: n
         (evicted > 0 ? ` (recycled out ${evicted} stale watchlist entr${evicted === 1 ? "y" : "ies"} to make room).` : "."),
       { added, evicted, candidates: candidates.length },
     );
+  } else {
+    recordLog("debug", "discovery", `DexScreener returned ${candidates.length} trending token(s), all already on the watchlist — nothing new to add.`);
   }
   return { added, candidates: candidates.length, evicted };
 }
