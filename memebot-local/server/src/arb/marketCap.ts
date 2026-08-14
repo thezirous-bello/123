@@ -15,8 +15,23 @@ const COINGECKO_IDS_PER_CALL = 250; // CoinGecko /coins/markets max per_page
 const CMC_IDS_PER_CALL = 100; // stays well under CMC's per-call and credit limits
 const USER_AGENT = "memebot-local/1.0 (+https://github.com)";
 
-let lastRefreshAtMs = 0;
+let lastFullRefreshAtMs = 0;
 let refreshInFlight: Promise<void> | null = null;
+// Coin ids already covered by a market-cap lookup (either full or
+// catch-up), keyed "source:id" — lets a brand-new coin id (identity data
+// that only just resolved, e.g. from an exchange identity.ts hasn't
+// finished paginating through yet) get its market cap looked up promptly
+// instead of waiting for the next REFRESH_INTERVAL_MS window.
+const knownCoinIds = new Set<string>();
+
+/** Test-only: resets the module-level refresh state (this module's timers
+ * and known-ids set persist across the whole process, so tests exercising
+ * refreshMarketCapIfStale need a clean slate between cases). */
+export function _resetMarketCapRefreshStateForTests(): void {
+  lastFullRefreshAtMs = 0;
+  refreshInFlight = null;
+  knownCoinIds.clear();
+}
 
 function upsertMarketCap(source: "coingecko" | "cmc", coinId: string, marketCapUsd: number | null): void {
   db.prepare(
@@ -81,36 +96,60 @@ async function fetchCoinGeckoMarketCapBatch(ids: string[]): Promise<CoinGeckoMar
   }
 }
 
+async function refreshCoinIds(coingeckoIds: string[], cmcIds: string[]): Promise<void> {
+  for (const batch of chunk(coingeckoIds, COINGECKO_IDS_PER_CALL)) {
+    const entries = await fetchCoinGeckoMarketCapBatch(batch);
+    if (!entries) continue;
+    for (const e of entries) {
+      if (e.id) upsertMarketCap("coingecko", e.id, typeof e.market_cap === "number" ? e.market_cap : null);
+    }
+  }
+  if (isCoinMarketCapConfigured()) {
+    for (const batch of chunk(cmcIds, CMC_IDS_PER_CALL)) {
+      const caps = await fetchCmcMarketCaps(batch);
+      if (!caps) continue;
+      for (const id of batch) upsertMarketCap("cmc", id, caps.get(id) ?? null);
+    }
+  }
+}
+
 /**
  * Refreshes cached market caps for every coin this app currently has
- * identity data for, from whichever source resolved it — at most once per
- * REFRESH_INTERVAL_MS, coalesces concurrent calls. Deliberately not awaited
- * on the scan hot path (see arb/controller.ts). Shares the same rate-limit
- * gate as identity.ts's CoinGecko calls (see coingeckoRateLimit.ts) so the
- * two refreshers never together exceed CoinGecko's actual limit.
+ * identity data for. Two triggers, so a coin never waits a full
+ * REFRESH_INTERVAL_MS just because its identity happened to resolve after
+ * the last full refresh already ran (very possible on a cold start, since
+ * identity.ts's CoinGecko pagination is rate-limit-paced and can take
+ * several minutes to cover all configured exchanges):
+ *   1. A full refresh, at most once per REFRESH_INTERVAL_MS, covering
+ *      every currently-known coin id.
+ *   2. A cheap "catch-up" refresh for any coin id identity.ts has resolved
+ *      since the last time THIS function saw it — runs every call,
+ *      independent of the full-refresh interval, but is a no-op (just a
+ *      DB query + Set diff) once nothing new has appeared.
+ * Coalesces concurrent calls. Deliberately not awaited on the scan hot path
+ * (see arb/controller.ts). Shares the same rate-limit gate as identity.ts's
+ * CoinGecko calls (see coingeckoRateLimit.ts) so the two refreshers never
+ * together exceed CoinGecko's actual limit.
  */
 export function refreshMarketCapIfStale(): Promise<void> {
-  const now = Date.now();
-  if (now - lastRefreshAtMs < REFRESH_INTERVAL_MS) return Promise.resolve();
   if (refreshInFlight) return refreshInFlight;
-  lastRefreshAtMs = now;
-  refreshInFlight = (async () => {
-    const { coingeckoIds, cmcIds } = distinctCachedCoinIds();
-    for (const batch of chunk(coingeckoIds, COINGECKO_IDS_PER_CALL)) {
-      const entries = await fetchCoinGeckoMarketCapBatch(batch);
-      if (!entries) continue;
-      for (const e of entries) {
-        if (e.id) upsertMarketCap("coingecko", e.id, typeof e.market_cap === "number" ? e.market_cap : null);
-      }
-    }
-    if (isCoinMarketCapConfigured()) {
-      for (const batch of chunk(cmcIds, CMC_IDS_PER_CALL)) {
-        const caps = await fetchCmcMarketCaps(batch);
-        if (!caps) continue;
-        for (const id of batch) upsertMarketCap("cmc", id, caps.get(id) ?? null);
-      }
-    }
-  })().finally(() => {
+  const now = Date.now();
+  const { coingeckoIds, cmcIds } = distinctCachedCoinIds();
+  const dueForFullRefresh = now - lastFullRefreshAtMs >= REFRESH_INTERVAL_MS;
+
+  const newCoingeckoIds = coingeckoIds.filter((id) => !knownCoinIds.has(`coingecko:${id}`));
+  const newCmcIds = cmcIds.filter((id) => !knownCoinIds.has(`cmc:${id}`));
+  const hasNewIds = newCoingeckoIds.length > 0 || newCmcIds.length > 0;
+
+  if (!dueForFullRefresh && !hasNewIds) return Promise.resolve();
+
+  const [refreshCoingeckoIds, refreshCmcIds] = dueForFullRefresh ? [coingeckoIds, cmcIds] : [newCoingeckoIds, newCmcIds];
+  if (refreshCoingeckoIds.length === 0 && refreshCmcIds.length === 0) return Promise.resolve();
+
+  if (dueForFullRefresh) lastFullRefreshAtMs = now;
+  refreshInFlight = refreshCoinIds(refreshCoingeckoIds, refreshCmcIds).finally(() => {
+    for (const id of refreshCoingeckoIds) knownCoinIds.add(`coingecko:${id}`);
+    for (const id of refreshCmcIds) knownCoinIds.add(`cmc:${id}`);
     refreshInFlight = null;
   });
   return refreshInFlight;

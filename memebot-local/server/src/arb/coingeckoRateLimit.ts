@@ -28,3 +28,10 @@ export function backOffAfterRateLimit(retryAfterHeader: string | null): number {
   nextSlotAtMs = Date.now() + backoffMs;
   return backoffMs;
 }
+
+/** Test-only: this module's pacing state persists across the whole process,
+ * so tests that make several calls in a row need a clean slate to avoid a
+ * real multi-second wait bleeding in from another test's timing. */
+export function _resetCoinGeckoRateLimitStateForTests(): void {
+  nextSlotAtMs = 0;
+}
