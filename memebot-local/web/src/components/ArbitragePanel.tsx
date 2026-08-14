@@ -1,5 +1,17 @@
 import { useEffect, useState } from "react";
-import { api, type ArbOpportunity, type ArbStatus, type ArbStrategyConfig, type ArbTrade, type ArbWallet, type ExchangeId, type LogEntry } from "../api/client.js";
+import {
+  api,
+  type ArbExchangeHealth,
+  type ArbJourney,
+  type ArbOpportunity,
+  type ArbStatus,
+  type ArbStrategyConfig,
+  type ArbTrade,
+  type ArbWallet,
+  type ExchangeId,
+  type JourneyStatus,
+  type LogEntry,
+} from "../api/client.js";
 import { useRefreshSignal } from "../hooks/useRefreshSignal.js";
 import { Panel } from "./Panel.js";
 import { Badge } from "./Badge.js";
@@ -12,7 +24,7 @@ import { SystemAlertsFeed } from "./SystemAlertsFeed.js";
 import { PortfolioExposureDonut } from "./PortfolioExposureDonut.js";
 import { logsToAlerts } from "../lib/alerts.js";
 
-const ALL_EXCHANGES: ExchangeId[] = ["binance", "bybit", "okx", "kucoin", "gateio", "mexc"];
+const ALL_EXCHANGES: ExchangeId[] = ["binance", "bybit", "okx", "kucoin", "gateio", "mexc", "kraken", "bitstamp"];
 
 function arbPnlStats(trades: ArbTrade[]): PnlStats {
   const wins = trades.filter((t) => Number(t.netProfitUsd) > 0);
@@ -36,6 +48,8 @@ export function ArbitragePanel() {
   const [config, setConfig] = useState<ArbStrategyConfig | null>(null);
   const [opportunities, setOpportunities] = useState<ArbOpportunity[]>([]);
   const [trades, setTrades] = useState<ArbTrade[]>([]);
+  const [journeys, setJourneys] = useState<ArbJourney[]>([]);
+  const [exchangeHealth, setExchangeHealth] = useState<ArbExchangeHealth[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +63,8 @@ export function ArbitragePanel() {
     api.arbConfig().then(setConfig).catch(() => {});
     api.arbOpportunities().then(setOpportunities).catch(() => {});
     api.arbTrades().then(setTrades).catch(() => {});
+    api.arbJourneys().then(setJourneys).catch(() => {});
+    api.arbExchangeHealth().then(setExchangeHealth).catch(() => {});
     api.logs(200).then(setLogs).catch(() => {});
   }
 
@@ -228,6 +244,58 @@ export function ArbitragePanel() {
 
       <NetworkMapPanel title="Network Map — Exchanges" hubLabel={ARB_BOT_HUB_LABEL} services={ARB_BOT_SERVICES} hintForDownProvider={(id) => hintForDownProvider(id)} />
 
+      <Panel title="Exchange Health">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-xs">
+            <thead className="text-white/40">
+              <tr>
+                <th className="pb-1 pr-3">Exchange</th>
+                <th className="pb-1 pr-3">API Key</th>
+                <th className="pb-1 pr-3">Coin Identity Data</th>
+                <th className="pb-1 pr-3">Real Balance</th>
+                <th className="pb-1">Bot Capital In Flight</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono text-white/70">
+              {exchangeHealth.map((h) => (
+                <tr key={h.exchange} className="border-t border-white/5">
+                  <td className="py-1 pr-3 font-semibold text-white/80">{h.exchange.toUpperCase()}</td>
+                  <td className="py-1 pr-3">
+                    <Badge tone={h.apiKeyConfigured ? "good" : "warn"}>{h.apiKeyConfigured ? "CONFIGURED" : "NOT SET"}</Badge>
+                  </td>
+                  <td className="py-1 pr-3">
+                    <Badge tone={h.identityDataCached ? "good" : "neutral"}>{h.identityDataCached ? "CACHED" : "PENDING"}</Badge>
+                  </td>
+                  <td className="py-1 pr-3">
+                    {h.realBalance.hasRealFunds === null ? (
+                      <span className="text-white/30">unknown</span>
+                    ) : (
+                      <Badge tone={h.realBalance.hasRealFunds ? "accent" : "neutral"}>{h.realBalance.hasRealFunds ? "HAS FUNDS" : "EMPTY"}</Badge>
+                    )}
+                  </td>
+                  <td className="py-1 text-white/70">${Number(h.botCommittedCapitalUsd).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-[10px] text-white/30">
+          Real balances are informational only — the bot never trades against them, and existing funds on any exchange are never touched.
+        </p>
+      </Panel>
+
+      <Panel title={`Journeys (${journeys.filter((j) => j.status !== "closed").length} active, ${journeys.length} total)`}>
+        {journeys.length === 0 ? (
+          <p className="text-sm text-white/40">No journeys yet — a journey opens once a qualifying opportunity clears the identity, deposit, and spread gates.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {journeys.slice(0, 25).map((j) => (
+              <JourneyRow key={j.id} journey={j} busy={busy} onAbort={(reason) => run(() => api.arbAbortJourney(j.id, reason))} />
+            ))}
+          </div>
+        )}
+      </Panel>
+
       <Panel
         title="Strategy Config"
         action={
@@ -309,6 +377,41 @@ function OpportunityRow({ opportunity }: { opportunity: ArbOpportunity }) {
       <Badge tone={Number(opportunity.netSpreadPct) > 0 ? "accent" : "neutral"}>net {Number(opportunity.netSpreadPct).toFixed(3)}%</Badge>
       {opportunity.skipReason && <span className="text-white/30">{opportunity.skipReason}</span>}
       <span className="ml-auto text-white/30">{new Date(opportunity.createdAt).toLocaleTimeString()}</span>
+    </div>
+  );
+}
+
+const JOURNEY_STATUS_TONE: Record<JourneyStatus, "neutral" | "good" | "warn" | "danger" | "accent"> = {
+  in_transit: "accent",
+  checking_reverse: "warn",
+  returning_home: "warn",
+  closed: "good",
+};
+
+function JourneyRow({ journey, busy, onAbort }: { journey: ArbJourney; busy: boolean; onAbort: (reason: string) => void }) {
+  const profit = Number(journey.realizedProfitUsd);
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-sm border border-white/5 bg-black/20 px-3 py-2 font-mono text-xs">
+      <Badge tone={JOURNEY_STATUS_TONE[journey.status]}>{journey.status.replace("_", " ").toUpperCase()}</Badge>
+      <span className="font-semibold text-white/80">{journey.symbol}</span>
+      <span className="text-white/50">
+        {journey.originExchange} → {journey.currentExchange}
+        {journey.legDestinationExchange ? ` → ${journey.legDestinationExchange}` : ""}
+      </span>
+      <span className="text-white/40">principal ${Number(journey.principalUsd).toFixed(2)}</span>
+      <Badge tone={profit >= 0 ? "good" : "danger"}>{profit >= 0 ? "+" : ""}${profit.toFixed(2)}</Badge>
+      <span className="text-white/30">leg {journey.legCount}</span>
+      {journey.closeReason && <span className="text-white/30">{journey.closeReason}</span>}
+      {journey.status !== "closed" && (
+        <button
+          disabled={busy}
+          onClick={() => onAbort("Manually aborted from dashboard.")}
+          className="ml-auto rounded border border-red-500/40 px-2 py-1 text-[10px] font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+        >
+          ABORT
+        </button>
+      )}
+      <span className={journey.status === "closed" ? "text-white/30" : "ml-auto text-white/30"}>{new Date(journey.openedAt).toLocaleTimeString()}</span>
     </div>
   );
 }
@@ -424,6 +527,39 @@ function ConfigEditor({ config, busy, onSave }: { config: ArbStrategyConfig; bus
             />
           </label>
           {field("startingBalanceUsd", "Paper starting balance $", 100)}
+        </div>
+      </div>
+
+      <div>
+        <h4 className="mb-2 text-xs font-semibold uppercase text-white/50">Journey simulation</h4>
+        <p className="mb-2 text-[10px] text-white/30">
+          Models the real sequence — buy, withdraw, wait for transfer, sell — instead of an instant simultaneous fill on both exchanges.
+        </p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {field("simulatedWithdrawalFeeUsd", "Withdrawal fee $ (per leg)", 0.5)}
+          {field("simulatedTransferMinutes", "Transfer time (min)", 1)}
+          {field("reverseCheckWindowSeconds", "Reverse-check window (s)", 5)}
+          {field("maxConcurrentJourneys", "Max concurrent journeys", 1)}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setDraft({ ...draft, requireCoinIdentityVerified: !draft.requireCoinIdentityVerified })}
+            className={`rounded-md border px-3 py-1.5 text-xs font-mono ${
+              draft.requireCoinIdentityVerified ? "border-sky-500/50 bg-sky-500/15 text-sky-300" : "border-white/15 text-white/50 hover:bg-white/10"
+            }`}
+          >
+            {draft.requireCoinIdentityVerified ? "✓ " : ""}Require coin-identity verified
+          </button>
+          <button
+            type="button"
+            onClick={() => setDraft({ ...draft, requireDepositVerified: !draft.requireDepositVerified })}
+            className={`rounded-md border px-3 py-1.5 text-xs font-mono ${
+              draft.requireDepositVerified ? "border-sky-500/50 bg-sky-500/15 text-sky-300" : "border-white/15 text-white/50 hover:bg-white/10"
+            }`}
+          >
+            {draft.requireDepositVerified ? "✓ " : ""}Require deposit-status verified
+          </button>
         </div>
       </div>
 

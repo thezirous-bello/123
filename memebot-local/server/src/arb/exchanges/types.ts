@@ -1,4 +1,4 @@
-export type ExchangeId = "binance" | "bybit" | "okx" | "kucoin" | "gateio" | "mexc";
+export type ExchangeId = "binance" | "bybit" | "okx" | "kucoin" | "gateio" | "mexc" | "kraken" | "bitstamp";
 
 export interface TickerQuote {
   bid: number; // best bid — what you'd receive per unit selling right now

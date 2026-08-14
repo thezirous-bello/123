@@ -20,12 +20,16 @@ export const ALL_BOT_SERVICES: ServiceNode[] = [
   { id: "kucoin", label: "KUCOIN", x: 480, y: 340 },
   { id: "gateio", label: "GATE.IO", x: 620, y: 170 },
   { id: "mexc", label: "MEXC", x: 300, y: 320 },
+  { id: "kraken", label: "KRAKEN", x: 700, y: 300 },
+  { id: "bitstamp", label: "BITSTAMP", x: 150, y: 400 },
+  { id: "coingecko", label: "COINGECKO", x: 400, y: 50 },
 ];
 
 export const ALL_BOTS_HUB_LABEL = "ALL BOTS (LOCAL)";
 
-// The arbitrage bot's own map — just the six exchanges it actually
-// compares prices across, laid out in a hexagon around the local hub.
+// The arbitrage bot's own map — the eight exchanges it actually compares
+// prices across, plus CoinGecko for cross-exchange coin-identity
+// verification, laid out around the local hub.
 export const ARB_BOT_SERVICES: ServiceNode[] = [
   { id: "binance", label: "BINANCE", x: 550, y: 230 },
   { id: "okx", label: "OKX", x: 450, y: 57 },
@@ -33,6 +37,9 @@ export const ARB_BOT_SERVICES: ServiceNode[] = [
   { id: "bybit", label: "BYBIT", x: 150, y: 230 },
   { id: "gateio", label: "GATE.IO", x: 250, y: 403 },
   { id: "mexc", label: "MEXC", x: 450, y: 403 },
+  { id: "kraken", label: "KRAKEN", x: 620, y: 340 },
+  { id: "bitstamp", label: "BITSTAMP", x: 80, y: 340 },
+  { id: "coingecko", label: "COINGECKO (identity)", x: 350, y: 470 },
 ];
 
 export const ARB_BOT_HUB_LABEL = "ARBITRAGE SCANNER (LOCAL)";

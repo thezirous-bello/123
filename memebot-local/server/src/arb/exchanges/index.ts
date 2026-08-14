@@ -1,6 +1,8 @@
 import { binanceAdapter } from "./binance.js";
+import { bitstampAdapter } from "./bitstamp.js";
 import { bybitSpotAdapter } from "./bybitSpot.js";
 import { gateioAdapter } from "./gateio.js";
+import { krakenAdapter } from "./kraken.js";
 import { kucoinAdapter } from "./kucoin.js";
 import { mexcAdapter } from "./mexc.js";
 import { okxAdapter } from "./okx.js";
@@ -15,6 +17,8 @@ export const EXCHANGE_REGISTRY: Record<ExchangeId, ExchangeAdapter> = {
   kucoin: kucoinAdapter,
   gateio: gateioAdapter,
   mexc: mexcAdapter,
+  kraken: krakenAdapter,
+  bitstamp: bitstampAdapter,
 };
 
 export const ALL_EXCHANGE_IDS = Object.keys(EXCHANGE_REGISTRY) as ExchangeId[];

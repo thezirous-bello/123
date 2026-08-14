@@ -80,7 +80,7 @@ export const ArbStrategyConfigObjectSchema = z
   .object({
     enabled: z.boolean().default(false),
 
-    exchanges: z.array(ExchangeIdSchema).min(2).default(["binance", "bybit", "okx", "kucoin", "gateio", "mexc"]),
+    exchanges: z.array(ExchangeIdSchema).min(2).default(["binance", "bybit", "okx", "kucoin", "gateio", "mexc", "kraken", "bitstamp"]),
     symbols: z.array(z.string()).min(1).default(DEFAULT_ARB_SYMBOLS),
 
     scanIntervalSeconds: z.number().gt(0).default(10),
@@ -93,7 +93,31 @@ export const ArbStrategyConfigObjectSchema = z
     // that — otherwise it's just logged as a skipped/observed opportunity.
     takerFeePctOverride: z.number().gte(0).nullable().default(null), // null -> use each exchange's own defaultTakerFeePct
     safetyBufferPct: z.number().gte(0).default(0.05),
-    minNetSpreadPct: z.number().gte(0).default(0.02),
+    // Must clear >1% net (after fees + buffer) to qualify as a real trade,
+    // not just a fee-eating rounding blip.
+    minNetSpreadPct: z.number().gte(0).default(1),
+
+    // ---- Sequential capital-moving simulation (buy -> withdraw -> sell ->
+    // chain-or-return-home) — see arb/journeyEngine.ts for the state machine.
+    // None of this is a real transfer time/fee table (this app has no way to
+    // know that per-asset/per-network without a live account), so these are
+    // deliberately simple, clearly-labeled estimates, configurable rather
+    // than hardcoded.
+    simulatedWithdrawalFeeUsd: z.number().gte(0).default(2),
+    simulatedTransferMinutes: z.number().gt(0).default(5),
+    // How long, after landing with cash on the sell exchange, to keep
+    // checking for a fresh opportunity to chain into before giving up and
+    // wiring principal + profit back to the exchange this journey started on.
+    reverseCheckWindowSeconds: z.number().gt(0).default(30),
+    // Safety cap on capital-at-risk: how many journeys can be in flight
+    // (bought but not yet fully returned home) at once.
+    maxConcurrentJourneys: z.number().int().gt(0).default(5),
+    // Both gates default ON — this is the direct fix for "traded a same-
+    // symbol-different-coin" and "bought into a platform where deposits
+    // were blocked." Turning either off is a deliberate, explicit opt-out,
+    // not the default.
+    requireCoinIdentityVerified: z.boolean().default(true),
+    requireDepositVerified: z.boolean().default(true),
 
     startingBalanceUsd: z.number().gt(0).default(10_000),
   })

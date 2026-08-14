@@ -470,4 +470,67 @@ CREATE TABLE IF NOT EXISTS arb_trades (
   created_at TEXT NOT NULL
 );
 
+-- Cross-exchange coin-identity cache (CoinGecko's per-exchange ticker->coin
+-- mapping) — a symbol on two exchanges is only ever treated as the same
+-- tradeable asset when both sides resolve to the same coingecko_id. Refreshed
+-- on a long interval (identity metadata barely changes), not per scan.
+CREATE TABLE IF NOT EXISTS coin_identity_cache (
+  exchange_id TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  coingecko_id TEXT NOT NULL,
+  checked_at TEXT NOT NULL,
+  PRIMARY KEY (exchange_id, symbol)
+);
+
+-- Per-exchange, per-symbol "can we actually deposit this coin there right
+-- now" — fetched via each exchange's own read-only authenticated API when
+-- credentials are configured. Cached with a moderate TTL (deposit status can
+-- genuinely change, e.g. during a chain upgrade/maintenance) so the arb scan
+-- loop isn't making a signed request every 10s for every symbol.
+CREATE TABLE IF NOT EXISTS deposit_status_cache (
+  exchange_id TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  deposit_enabled INTEGER NOT NULL,
+  checked_at TEXT NOT NULL,
+  PRIMARY KEY (exchange_id, symbol)
+);
+
+-- Real (informational only) balance on each exchange, fetched via read-only
+-- API keys when configured — used strictly to warn about / never touch
+-- pre-existing funds the user already has there. The bot's actual paper P&L
+-- accounting is entirely separate (arb_paper_account + arb_journeys below);
+-- this table never feeds into a trading decision, only the dashboard display.
+CREATE TABLE IF NOT EXISTS arb_exchange_balances (
+  exchange_id TEXT PRIMARY KEY,
+  real_balance_usd TEXT,
+  checked_at TEXT
+);
+
+-- A single arbitrage "journey": paper capital that left origin_exchange,
+-- may hop through one or more legs (chained whenever a fresh opportunity
+-- appears within the reverse-check window instead of idly paying a
+-- withdrawal fee to come straight home), and eventually returns principal +
+-- profit to origin_exchange. See arb/journeyEngine.ts for the state machine.
+CREATE TABLE IF NOT EXISTS arb_journeys (
+  id TEXT PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  origin_exchange TEXT NOT NULL,
+  current_exchange TEXT NOT NULL,
+  leg_destination_exchange TEXT,
+  status TEXT NOT NULL CHECK (status IN ('in_transit', 'checking_reverse', 'returning_home', 'closed')),
+  principal_usd TEXT NOT NULL,
+  asset_qty TEXT,
+  usd_amount TEXT,
+  realized_profit_usd TEXT NOT NULL DEFAULT '0',
+  leg_count INTEGER NOT NULL DEFAULT 1,
+  opened_at TEXT NOT NULL,
+  leg_started_at TEXT NOT NULL,
+  arrives_at TEXT,
+  reverse_check_deadline TEXT,
+  closed_at TEXT,
+  close_reason TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_arb_journeys_status ON arb_journeys (status);
+
 CREATE INDEX IF NOT EXISTS idx_arb_trades_created ON arb_trades (created_at);

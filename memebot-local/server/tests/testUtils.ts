@@ -20,6 +20,10 @@ const TABLES = [
   "futures_signals",
   "arb_trades",
   "arb_opportunities",
+  "arb_journeys",
+  "arb_exchange_balances",
+  "coin_identity_cache",
+  "deposit_status_cache",
 ];
 
 /** Wipes all rows (schema stays) so each test starts from a clean, known

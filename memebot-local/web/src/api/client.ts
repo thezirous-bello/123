@@ -346,6 +346,9 @@ export const api = {
   arbResume: () => post("/arb/control/resume", { confirm: true }),
   arbOpportunities: () => get<ArbOpportunity[]>("/arb/opportunities"),
   arbTrades: () => get<ArbTrade[]>("/arb/trades"),
+  arbJourneys: () => get<ArbJourney[]>("/arb/journeys"),
+  arbAbortJourney: (id: string, reason: string) => post<ArbJourney>(`/arb/journeys/${id}/abort`, { reason }),
+  arbExchangeHealth: () => get<ArbExchangeHealth[]>("/arb/exchange-health"),
 };
 
 // ---- Bybit bots: shared types ----
@@ -636,7 +639,7 @@ export interface FuturesTrade {
 
 // ---- Cross-exchange arbitrage bot (paper-only) ----
 
-export type ExchangeId = "binance" | "bybit" | "okx" | "kucoin" | "gateio" | "mexc";
+export type ExchangeId = "binance" | "bybit" | "okx" | "kucoin" | "gateio" | "mexc" | "kraken" | "bitstamp";
 
 export interface ArbStatus {
   running: boolean;
@@ -667,7 +670,43 @@ export interface ArbStrategyConfig {
   takerFeePctOverride: number | null;
   safetyBufferPct: number;
   minNetSpreadPct: number;
+  simulatedWithdrawalFeeUsd: number;
+  simulatedTransferMinutes: number;
+  reverseCheckWindowSeconds: number;
+  maxConcurrentJourneys: number;
+  requireCoinIdentityVerified: boolean;
+  requireDepositVerified: boolean;
   startingBalanceUsd: number;
+}
+
+export type JourneyStatus = "in_transit" | "checking_reverse" | "returning_home" | "closed";
+
+export interface ArbJourney {
+  id: string;
+  symbol: string;
+  originExchange: ExchangeId;
+  currentExchange: ExchangeId;
+  legDestinationExchange: ExchangeId | null;
+  status: JourneyStatus;
+  principalUsd: string;
+  assetQty: string | null;
+  usdAmount: string | null;
+  realizedProfitUsd: string;
+  legCount: number;
+  openedAt: string;
+  legStartedAt: string;
+  arrivesAt: string | null;
+  reverseCheckDeadline: string | null;
+  closedAt: string | null;
+  closeReason: string | null;
+}
+
+export interface ArbExchangeHealth {
+  exchange: ExchangeId;
+  apiKeyConfigured: boolean;
+  identityDataCached: boolean;
+  realBalance: { exchange: ExchangeId; hasRealFunds: boolean | null; checkedAt: string | null };
+  botCommittedCapitalUsd: string;
 }
 
 export interface ArbOpportunity {
@@ -713,7 +752,10 @@ export type ProviderId =
   | "okx"
   | "kucoin"
   | "gateio"
-  | "mexc";
+  | "mexc"
+  | "kraken"
+  | "bitstamp"
+  | "coingecko";
 
 export interface ProviderHealth {
   provider: ProviderId;

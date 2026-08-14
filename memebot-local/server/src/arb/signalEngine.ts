@@ -11,7 +11,7 @@ export interface SpreadOpportunity {
   netSpreadPct: number;
 }
 
-function takerFeePctFor(exchangeId: ExchangeId, config: ArbStrategyConfig): number {
+export function takerFeePctFor(exchangeId: ExchangeId, config: ArbStrategyConfig): number {
   return config.takerFeePctOverride ?? EXCHANGE_REGISTRY[exchangeId].defaultTakerFeePct;
 }
 
@@ -60,4 +60,20 @@ export function scanAllSymbols(tickersByExchange: Map<ExchangeId, Map<string, Ti
     if (opportunity) results.push(opportunity);
   }
   return results;
+}
+
+/** Every currently-positive opportunity whose BUY leg specifically
+ * originates from `fromExchange`, sorted best-net-spread-first — used by
+ * the journey engine's reverse-check step ("now that capital landed here
+ * as cash, is there something worth chaining into before paying a
+ * withdrawal fee to send it straight home"). Pure/synchronous; the caller
+ * still has to run the async identity/deposit gates over the results. */
+export function findOpportunitiesFromExchange(
+  fromExchange: ExchangeId,
+  tickersByExchange: Map<ExchangeId, Map<string, TickerQuote>>,
+  config: ArbStrategyConfig,
+): SpreadOpportunity[] {
+  return scanAllSymbols(tickersByExchange, config)
+    .filter((opp) => opp.buyExchange === fromExchange && opp.grossSpreadPct > 0)
+    .sort((a, b) => b.netSpreadPct - a.netSpreadPct);
 }

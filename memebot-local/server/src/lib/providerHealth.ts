@@ -13,7 +13,10 @@ export type ProviderId =
   | "okx"
   | "kucoin"
   | "gateio"
-  | "mexc";
+  | "mexc"
+  | "kraken"
+  | "bitstamp"
+  | "coingecko";
 
 export interface ProviderHealthState {
   provider: ProviderId;

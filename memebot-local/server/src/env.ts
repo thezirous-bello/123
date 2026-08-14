@@ -53,6 +53,35 @@ const EnvSchema = z.object({
     .optional()
     .transform((v) => v === "true")
     .pipe(z.boolean()),
+
+  // Arbitrage bot exchange credentials — READ-ONLY keys only (no trade, no
+  // withdrawal permission needed or wanted). Used exclusively for two
+  // read-only checks: (1) is deposit currently enabled for a given coin on
+  // this exchange, so the bot never buys into a dead end it can't move out
+  // of, and (2) this exchange's real account balance, so the bot can warn
+  // about (and never spend) funds it didn't itself move there. The arb bot
+  // never places a real order or withdrawal on any of these — all trade
+  // execution stays paper/simulated. Bybit reuses BYBIT_API_KEY/_SECRET
+  // above rather than a separate pair. Every one of these is optional; an
+  // exchange with no key configured just can't have its deposit-status
+  // verified, which (per the arb strategy's identity/deposit gates) means
+  // the bot won't complete a trade landing on it.
+  BINANCE_API_KEY: z.string().optional(),
+  BINANCE_API_SECRET: z.string().optional(),
+  OKX_API_KEY: z.string().optional(),
+  OKX_API_SECRET: z.string().optional(),
+  OKX_API_PASSPHRASE: z.string().optional(),
+  KUCOIN_API_KEY: z.string().optional(),
+  KUCOIN_API_SECRET: z.string().optional(),
+  KUCOIN_API_PASSPHRASE: z.string().optional(),
+  GATEIO_API_KEY: z.string().optional(),
+  GATEIO_API_SECRET: z.string().optional(),
+  MEXC_API_KEY: z.string().optional(),
+  MEXC_API_SECRET: z.string().optional(),
+  KRAKEN_API_KEY: z.string().optional(),
+  KRAKEN_API_SECRET: z.string().optional(),
+  BITSTAMP_API_KEY: z.string().optional(),
+  BITSTAMP_API_SECRET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -1,14 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { emergencyStopArb, getArbWallet, resumeArb, startArbBot, stopArbBot } from "../arb/controller.js";
+import { abortJourney, emergencyStopArb, getArbWallet, resumeArb, startArbBot, stopArbBot } from "../arb/controller.js";
 import { getArbStrategyConfig, updateArbStrategyConfig } from "../arb/configStore.js";
 import { ArbStrategyConfigObjectSchema, DEFAULT_ARB_SYMBOLS } from "../arb/schema.js";
 import { getArbBotState } from "../arb/state.js";
-import { listArbTrades, listOpportunities, realizedPnlSinceArb } from "../arb/repository.js";
+import { botControlledCapitalByExchange, listArbTrades, listExchangeBalances, listJourneys, listOpportunities, realizedPnlSinceArb } from "../arb/repository.js";
 import { ALL_EXCHANGE_IDS } from "../arb/exchanges/index.js";
+import { listExchangeAuthStatus } from "../arb/exchanges/auth/index.js";
+import { hasIdentityDataFor } from "../arb/identity.js";
 
 const EmergencyStopBodySchema = z.object({ reason: z.string().min(1).max(500) });
 const ResumeBodySchema = z.object({ confirm: z.literal(true) });
+const AbortJourneyBodySchema = z.object({ reason: z.string().min(1).max(500) });
 const ConfigPatchSchema = ArbStrategyConfigObjectSchema.partial();
 
 function decimalToPlain(value: unknown): unknown {
@@ -87,4 +90,39 @@ export default async function arbRoutes(app: FastifyInstance) {
 
   app.get("/arb/opportunities", async () => decimalToPlain(listOpportunities(100)));
   app.get("/arb/trades", async () => decimalToPlain(listArbTrades(200)));
+
+  /** Every in-flight-or-recent multi-leg journey (buy -> withdraw -> sell ->
+   * chain-or-return-home) — see arb/journeyEngine.ts for the state machine. */
+  app.get("/arb/journeys", async () => decimalToPlain(listJourneys(100)));
+
+  app.post("/arb/journeys/:id/abort", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = AbortJourneyBodySchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "validation_error", details: parsed.error.issues });
+    try {
+      return decimalToPlain(abortJourney(id, parsed.data.reason));
+    } catch (err) {
+      return reply.code(404).send({ error: "not_found", message: (err as Error).message });
+    }
+  });
+
+  /** Per-exchange operational status the dashboard needs to explain WHY a
+   * given exchange isn't completing trades: whether a read-only API key is
+   * configured for it, whether it has cached coin-identity data yet, its
+   * real (informational-only) balance snapshot, and how much of the bot's
+   * own paper capital is currently in flight there. */
+  app.get("/arb/exchange-health", async () => {
+    const config = getArbStrategyConfig();
+    const authStatus = listExchangeAuthStatus(config.exchanges);
+    const balances = listExchangeBalances(config.exchanges);
+    const committed = botControlledCapitalByExchange();
+    const balanceByExchange = new Map(balances.map((b) => [b.exchange, b]));
+    return config.exchanges.map((exchange) => ({
+      exchange,
+      apiKeyConfigured: authStatus.find((a) => a.exchange === exchange)?.configured ?? false,
+      identityDataCached: hasIdentityDataFor(exchange),
+      realBalance: balanceByExchange.get(exchange) ?? { exchange, hasRealFunds: null, checkedAt: null },
+      botCommittedCapitalUsd: committed[exchange]?.toFixed() ?? "0",
+    }));
+  });
 }

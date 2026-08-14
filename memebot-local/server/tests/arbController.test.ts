@@ -33,6 +33,13 @@ describe("arb controller — only logs genuinely crossed markets", () => {
       takerFeePctOverride: 0,
       safetyBufferPct: 0,
       minNetSpreadPct: 0.01,
+      // This suite is about signal detection (crossed vs. non-crossed
+      // markets), not the identity/deposit gates — those have their own
+      // dedicated coverage in arbJourneyEngine.test.ts. Without real
+      // CoinGecko/exchange-API data available in tests, both would
+      // otherwise report "unverifiable" and block every entry.
+      requireCoinIdentityVerified: false,
+      requireDepositVerified: false,
     });
     setArbRunning(true);
   });
