@@ -13,6 +13,7 @@ const COINGECKO_API_URL = "https://api.coingecko.com/api/v3";
 const REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const COINGECKO_IDS_PER_CALL = 250; // CoinGecko /coins/markets max per_page
 const CMC_IDS_PER_CALL = 100; // stays well under CMC's per-call and credit limits
+const USER_AGENT = "memebot-local/1.0 (+https://github.com)";
 
 let lastRefreshAtMs = 0;
 let refreshInFlight: Promise<void> | null = null;
@@ -57,7 +58,7 @@ async function fetchCoinGeckoMarketCapBatch(ids: string[]): Promise<CoinGeckoMar
   const startedAt = performance.now();
   try {
     const res = await fetch(`${COINGECKO_API_URL}/coins/markets?vs_currency=usd&ids=${ids.join(",")}&per_page=${ids.length}&page=1`, {
-      headers: { accept: "application/json" },
+      headers: { accept: "application/json", "user-agent": USER_AGENT },
     });
     if (res.status === 429) {
       recordProviderFailure("coingecko", "HTTP 429 on coins/markets");
@@ -66,7 +67,9 @@ async function fetchCoinGeckoMarketCapBatch(ids: string[]): Promise<CoinGeckoMar
       return null;
     }
     if (!res.ok) {
-      recordProviderFailure("coingecko", `HTTP ${res.status} on coins/markets`);
+      const bodyPreview = await res.text().then((t) => t.slice(0, 300)).catch(() => "");
+      recordProviderFailure("coingecko", `HTTP ${res.status} on coins/markets${bodyPreview ? `: ${bodyPreview}` : ""}`);
+      logger.warn({ status: res.status, body: bodyPreview }, "CoinGecko market-cap refresh request failed");
       return null;
     }
     const data = (await res.json()) as CoinGeckoMarketEntry[];

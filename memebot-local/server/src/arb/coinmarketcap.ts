@@ -21,6 +21,7 @@ const CMC_EXCHANGE_SLUG: Record<ExchangeId, string> = {
 };
 
 const CMC_API_URL = "https://pro-api.coinmarketcap.com";
+const USER_AGENT = "memebot-local/1.0 (+https://github.com)";
 // Independent second source: only worth calling when CoinGecko didn't
 // already cover an exchange for this refresh cycle, so the free-tier
 // monthly credit budget (10k) is barely touched even refreshing daily.
@@ -48,10 +49,12 @@ async function fetchExchangeMarketPairs(slug: string): Promise<CmcMarketPair[] |
   const startedAt = performance.now();
   try {
     const res = await fetch(`${CMC_API_URL}/v1/exchange/market-pairs/latest?slug=${slug}&limit=5000`, {
-      headers: { accept: "application/json", "X-CMC_PRO_API_KEY": env.COINMARKETCAP_API_KEY },
+      headers: { accept: "application/json", "user-agent": USER_AGENT, "X-CMC_PRO_API_KEY": env.COINMARKETCAP_API_KEY },
     });
     if (!res.ok) {
-      recordProviderFailure("coinmarketcap", `HTTP ${res.status} on exchange/market-pairs/latest (slug=${slug})`);
+      const bodyPreview = await res.text().then((t) => t.slice(0, 300)).catch(() => "");
+      recordProviderFailure("coinmarketcap", `HTTP ${res.status} on exchange/market-pairs/latest (slug=${slug})${bodyPreview ? `: ${bodyPreview}` : ""}`);
+      logger.warn({ slug, status: res.status, body: bodyPreview }, "CoinMarketCap identity refresh request failed");
       return null;
     }
     const data = (await res.json()) as CmcMarketPairsResponse;
@@ -125,10 +128,12 @@ export async function fetchCmcMarketCaps(cmcIds: string[]): Promise<Map<string, 
   const startedAt = performance.now();
   try {
     const res = await fetch(`${CMC_API_URL}/v2/cryptocurrency/quotes/latest?id=${cmcIds.join(",")}&convert=USD`, {
-      headers: { accept: "application/json", "X-CMC_PRO_API_KEY": env.COINMARKETCAP_API_KEY },
+      headers: { accept: "application/json", "user-agent": USER_AGENT, "X-CMC_PRO_API_KEY": env.COINMARKETCAP_API_KEY },
     });
     if (!res.ok) {
-      recordProviderFailure("coinmarketcap", `HTTP ${res.status} on cryptocurrency/quotes/latest`);
+      const bodyPreview = await res.text().then((t) => t.slice(0, 300)).catch(() => "");
+      recordProviderFailure("coinmarketcap", `HTTP ${res.status} on cryptocurrency/quotes/latest${bodyPreview ? `: ${bodyPreview}` : ""}`);
+      logger.warn({ status: res.status, body: bodyPreview }, "CoinMarketCap market-cap refresh request failed");
       return null;
     }
     const data = (await res.json()) as CmcQuotesResponse;

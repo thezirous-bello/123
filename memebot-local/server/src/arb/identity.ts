@@ -31,6 +31,9 @@ const MAX_PAGES_PER_EXCHANGE = 8;
 // changes minute to minute, so this only needs to run a couple of times a
 // day — not on every 10s scan tick.
 const REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
+// Node's fetch sends no User-Agent by default; a plain, honest one avoids
+// some APIs' bot-detection heuristics rejecting UA-less requests outright.
+const USER_AGENT = "memebot-local/1.0 (+https://github.com)";
 
 interface CoinGeckoTicker {
   base?: string;
@@ -62,7 +65,7 @@ async function fetchExchangeTickerPage(slug: string, page: number): Promise<{ ti
   const startedAt = performance.now();
   try {
     const res = await fetch(`${COINGECKO_API_URL}/exchanges/${slug}/tickers?page=${page}&depth=false`, {
-      headers: { accept: "application/json" },
+      headers: { accept: "application/json", "user-agent": USER_AGENT },
     });
     if (res.status === 429) {
       recordProviderFailure("coingecko", `HTTP 429 on exchanges/${slug}/tickers`);
@@ -71,7 +74,9 @@ async function fetchExchangeTickerPage(slug: string, page: number): Promise<{ ti
       return { tickers: null, rateLimited: true };
     }
     if (!res.ok) {
-      recordProviderFailure("coingecko", `HTTP ${res.status} on exchanges/${slug}/tickers`);
+      const bodyPreview = await res.text().then((t) => t.slice(0, 300)).catch(() => "");
+      recordProviderFailure("coingecko", `HTTP ${res.status} on exchanges/${slug}/tickers${bodyPreview ? `: ${bodyPreview}` : ""}`);
+      logger.warn({ slug, page, status: res.status, body: bodyPreview }, "CoinGecko identity refresh request failed");
       return { tickers: null, rateLimited: false };
     }
     const data = (await res.json()) as CoinGeckoTickersResponse;
