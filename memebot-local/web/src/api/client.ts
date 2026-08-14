@@ -676,6 +676,8 @@ export interface ArbStrategyConfig {
   maxConcurrentJourneys: number;
   requireCoinIdentityVerified: boolean;
   requireDepositVerified: boolean;
+  minMarketCapUsd: number;
+  requireMinMarketCap: boolean;
   startingBalanceUsd: number;
 }
 
@@ -755,7 +757,8 @@ export type ProviderId =
   | "mexc"
   | "kraken"
   | "bitstamp"
-  | "coingecko";
+  | "coingecko"
+  | "coinmarketcap";
 
 export interface ProviderHealth {
   provider: ProviderId;

@@ -487,7 +487,7 @@ function ConfigEditor({ config, busy, onSave }: { config: ArbStrategyConfig; bus
             onClick={loadRecommendedSymbols}
             className="rounded border border-sky-500/40 px-2 py-1 text-[10px] font-mono text-sky-300 hover:bg-sky-500/10 disabled:opacity-40"
           >
-            {loadingDefaults ? "Loading…" : "Load Recommended (~500) Coins"}
+            {loadingDefaults ? "Loading…" : "Load Recommended (~540) Coins"}
           </button>
         </div>
         <textarea
@@ -527,6 +527,7 @@ function ConfigEditor({ config, busy, onSave }: { config: ArbStrategyConfig; bus
             />
           </label>
           {field("startingBalanceUsd", "Paper starting balance $", 100)}
+          {field("minMarketCapUsd", "Min market cap $", 1_000_000)}
         </div>
       </div>
 
@@ -559,6 +560,15 @@ function ConfigEditor({ config, busy, onSave }: { config: ArbStrategyConfig; bus
             }`}
           >
             {draft.requireDepositVerified ? "✓ " : ""}Require deposit-status verified
+          </button>
+          <button
+            type="button"
+            onClick={() => setDraft({ ...draft, requireMinMarketCap: !draft.requireMinMarketCap })}
+            className={`rounded-md border px-3 py-1.5 text-xs font-mono ${
+              draft.requireMinMarketCap ? "border-sky-500/50 bg-sky-500/15 text-sky-300" : "border-white/15 text-white/50 hover:bg-white/10"
+            }`}
+          >
+            {draft.requireMinMarketCap ? "✓ " : ""}Require min market cap
           </button>
         </div>
       </div>

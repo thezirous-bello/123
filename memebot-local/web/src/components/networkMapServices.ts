@@ -23,6 +23,7 @@ export const ALL_BOT_SERVICES: ServiceNode[] = [
   { id: "kraken", label: "KRAKEN", x: 700, y: 300 },
   { id: "bitstamp", label: "BITSTAMP", x: 150, y: 400 },
   { id: "coingecko", label: "COINGECKO", x: 400, y: 50 },
+  { id: "coinmarketcap", label: "COINMARKETCAP (optional)", x: 480, y: 110 },
 ];
 
 export const ALL_BOTS_HUB_LABEL = "ALL BOTS (LOCAL)";
@@ -40,6 +41,7 @@ export const ARB_BOT_SERVICES: ServiceNode[] = [
   { id: "kraken", label: "KRAKEN", x: 620, y: 340 },
   { id: "bitstamp", label: "BITSTAMP", x: 80, y: 340 },
   { id: "coingecko", label: "COINGECKO (identity)", x: 350, y: 470 },
+  { id: "coinmarketcap", label: "COINMARKETCAP (fallback)", x: 500, y: 470 },
 ];
 
 export const ARB_BOT_HUB_LABEL = "ARBITRAGE SCANNER (LOCAL)";
@@ -47,5 +49,7 @@ export const ARB_BOT_HUB_LABEL = "ARBITRAGE SCANNER (LOCAL)";
 export function hintForDownProvider(providerId: string): string | null {
   if (providerId === "solanaRpc") return "try a free Helius RPC URL in .env (SOLANA_RPC_URL) — the public RPC rate-limits easily";
   if (providerId === "bybit") return "check your BYBIT_TESTNET_API_KEY/_SECRET (or BYBIT_API_KEY/_SECRET for live) in .env";
+  if (providerId === "coingecko")
+    return "CoinGecko's free public API has a low rate limit — occasional 429s are expected under normal use across 8 exchanges and self-resolve; set COINMARKETCAP_API_KEY in .env for an automatic fallback instead of trades staying blocked";
   return null;
 }

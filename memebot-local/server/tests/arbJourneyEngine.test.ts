@@ -14,10 +14,13 @@ function baseInput(overrides: Partial<EntryGateInput> = {}): EntryGateInput {
   return {
     identity: "match",
     depositGate: "enabled",
+    marketCap: "sufficient",
     netSpreadPct: 1.5,
     minNetSpreadPct: 1,
+    minMarketCapUsd: 50_000_000,
     requireCoinIdentityVerified: true,
     requireDepositVerified: true,
+    requireMinMarketCap: true,
     ...overrides,
   };
 }
@@ -63,16 +66,38 @@ describe("evaluateEntryGates", () => {
     expect(result.passed).toBe(true);
   });
 
-  it("fails when net spread is below the configured minimum, even with clean identity/deposit gates", () => {
+  it("fails when market cap is below the configured minimum", () => {
+    const result = evaluateEntryGates(baseInput({ marketCap: "insufficient" }));
+    expect(result.passed).toBe(false);
+    expect(result.reason).toMatch(/below the configured \$50,000,000 minimum/i);
+  });
+
+  it("fails when market cap is unverifiable — never assumes it's large enough", () => {
+    const result = evaluateEntryGates(baseInput({ marketCap: "unverifiable" }));
+    expect(result.passed).toBe(false);
+    expect(result.reason).toMatch(/could not verify this coin's market cap/i);
+  });
+
+  it("skips the market-cap check entirely when requireMinMarketCap is false", () => {
+    const result = evaluateEntryGates(baseInput({ marketCap: "insufficient", requireMinMarketCap: false }));
+    expect(result.passed).toBe(true);
+  });
+
+  it("fails when net spread is below the configured minimum, even with clean identity/deposit/market-cap gates", () => {
     const result = evaluateEntryGates(baseInput({ netSpreadPct: 0.4, minNetSpreadPct: 1 }));
     expect(result.passed).toBe(false);
     expect(result.reason).toMatch(/below the 1% minimum/i);
   });
 
-  it("checks identity before deposit before spread (priority order)", () => {
-    // Both identity and deposit are bad here; the identity failure must win.
-    const result = evaluateEntryGates(baseInput({ identity: "mismatch", depositGate: "disabled", netSpreadPct: 0.1 }));
+  it("checks identity before deposit before market cap before spread (priority order)", () => {
+    // Identity, deposit, market cap, and spread are all bad here; the identity failure must win.
+    const result = evaluateEntryGates(baseInput({ identity: "mismatch", depositGate: "disabled", marketCap: "insufficient", netSpreadPct: 0.1 }));
     expect(result.reason).toMatch(/different underlying coin/i);
+  });
+
+  it("checks deposit before market cap when identity passes", () => {
+    const result = evaluateEntryGates(baseInput({ depositGate: "disabled", marketCap: "insufficient" }));
+    expect(result.reason).toMatch(/deposits are currently disabled/i);
   });
 });
 

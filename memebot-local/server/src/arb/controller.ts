@@ -4,6 +4,7 @@ import { getArbStrategyConfig } from "./configStore.js";
 import { fetchAllTickers, type ExchangeId, type TickerQuote } from "./exchanges/index.js";
 import { checkDepositGate, refreshExchangeBalanceSnapshot } from "./exchanges/auth/index.js";
 import { refreshCoinIdentityIfStale, isSameCoinAcrossExchanges } from "./identity.js";
+import { refreshMarketCapIfStale, checkMinMarketCap } from "./marketCap.js";
 import { findOpportunitiesFromExchange, scanAllSymbols, takerFeePctFor, type SpreadOpportunity } from "./signalEngine.js";
 import { computeBuyFill, computeReturnHomeAmount, computeSellProceeds, evaluateEntryGates, hasArrived, shouldReturnHome } from "./journeyEngine.js";
 import {
@@ -100,6 +101,7 @@ async function scan(config: ArbStrategyConfig) {
   // the scan tick on a multi-minute CoinGecko crawl or a batch of signed
   // balance calls.
   refreshCoinIdentityIfStale(config.exchanges).catch(() => {});
+  refreshMarketCapIfStale().catch(() => {});
   maybeRefreshExchangeBalances(config.exchanges);
 
   if (tickersByExchange.size < 2) {
@@ -174,13 +176,17 @@ async function whySkipEntry(opp: SpreadOpportunity, config: ArbStrategyConfig, t
 
   const identity = config.requireCoinIdentityVerified ? isSameCoinAcrossExchanges(opp.symbol, opp.buyExchange, opp.sellExchange) : "match";
   const depositGate = config.requireDepositVerified ? await checkDepositGate(opp.sellExchange, opp.symbol) : "enabled";
+  const marketCap = config.requireMinMarketCap ? checkMinMarketCap(opp.symbol, opp.buyExchange, opp.sellExchange, config.minMarketCapUsd) : "sufficient";
   const gate = evaluateEntryGates({
     identity,
     depositGate,
+    marketCap,
     netSpreadPct: opp.netSpreadPct,
     minNetSpreadPct: config.minNetSpreadPct,
+    minMarketCapUsd: config.minMarketCapUsd,
     requireCoinIdentityVerified: config.requireCoinIdentityVerified,
     requireDepositVerified: config.requireDepositVerified,
+    requireMinMarketCap: config.requireMinMarketCap,
   });
   return gate.reason;
 }
@@ -289,13 +295,17 @@ async function findQualifyingOpportunityFrom(
   for (const opp of candidates) {
     const identity = config.requireCoinIdentityVerified ? isSameCoinAcrossExchanges(opp.symbol, opp.buyExchange, opp.sellExchange) : "match";
     const depositGate = config.requireDepositVerified ? await checkDepositGate(opp.sellExchange, opp.symbol) : "enabled";
+    const marketCap = config.requireMinMarketCap ? checkMinMarketCap(opp.symbol, opp.buyExchange, opp.sellExchange, config.minMarketCapUsd) : "sufficient";
     const gate = evaluateEntryGates({
       identity,
       depositGate,
+      marketCap,
       netSpreadPct: opp.netSpreadPct,
       minNetSpreadPct: config.minNetSpreadPct,
+      minMarketCapUsd: config.minMarketCapUsd,
       requireCoinIdentityVerified: config.requireCoinIdentityVerified,
       requireDepositVerified: config.requireDepositVerified,
+      requireMinMarketCap: config.requireMinMarketCap,
     });
     if (gate.passed) return opp;
   }

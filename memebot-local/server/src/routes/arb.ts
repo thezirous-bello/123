@@ -56,7 +56,7 @@ export default async function arbRoutes(app: FastifyInstance) {
 
   app.get("/arb/config", async () => getArbStrategyConfig());
 
-  /** The full ~500-coin curated default symbol list, so the dashboard can
+  /** The full ~540-coin curated default symbol list, so the dashboard can
    * offer "load recommended coins" without the frontend having to duplicate
    * (and risk drifting from) this list — useful both for fresh installs and
    * for anyone whose settings already persisted the old, shorter default

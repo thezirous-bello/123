@@ -471,15 +471,32 @@ CREATE TABLE IF NOT EXISTS arb_trades (
 );
 
 -- Cross-exchange coin-identity cache (CoinGecko's per-exchange ticker->coin
--- mapping) — a symbol on two exchanges is only ever treated as the same
--- tradeable asset when both sides resolve to the same coingecko_id. Refreshed
--- on a long interval (identity metadata barely changes), not per scan.
+-- mapping, with CoinMarketCap as an optional independent second source) — a
+-- symbol on two exchanges is only ever treated as the same tradeable asset
+-- when both sides resolve to the same coingecko_id OR both resolve to the
+-- same cmc_id (never mixed across sources — a CoinGecko id and a CMC id are
+-- different numbering spaces and are never compared to each other). Both id
+-- columns are nullable since either source can independently populate a row.
+-- Refreshed on a long interval (identity metadata barely changes), not per scan.
 CREATE TABLE IF NOT EXISTS coin_identity_cache (
   exchange_id TEXT NOT NULL,
   symbol TEXT NOT NULL,
-  coingecko_id TEXT NOT NULL,
+  coingecko_id TEXT,
+  cmc_id TEXT,
   checked_at TEXT NOT NULL,
   PRIMARY KEY (exchange_id, symbol)
+);
+
+-- Current market cap (USD) per coin, keyed by (source, id) since CoinGecko
+-- and CoinMarketCap use different id spaces for the same coin — resolved via
+-- whichever id coin_identity_cache has for a given exchange+symbol. Backs
+-- the "skip trades on coins below $X market cap" gate (see journeyEngine.ts).
+CREATE TABLE IF NOT EXISTS coin_market_cap_cache (
+  source TEXT NOT NULL CHECK (source IN ('coingecko', 'cmc')),
+  coin_id TEXT NOT NULL,
+  market_cap_usd TEXT,
+  checked_at TEXT NOT NULL,
+  PRIMARY KEY (source, coin_id)
 );
 
 -- Per-exchange, per-symbol "can we actually deposit this coin there right

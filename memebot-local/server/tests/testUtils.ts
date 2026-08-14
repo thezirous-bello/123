@@ -23,6 +23,7 @@ const TABLES = [
   "arb_journeys",
   "arb_exchange_balances",
   "coin_identity_cache",
+  "coin_market_cap_cache",
   "deposit_status_cache",
 ];
 

@@ -82,6 +82,17 @@ const EnvSchema = z.object({
   KRAKEN_API_SECRET: z.string().optional(),
   BITSTAMP_API_KEY: z.string().optional(),
   BITSTAMP_API_SECRET: z.string().optional(),
+
+  // OPTIONAL. CoinMarketCap API key — a second, independent source for the
+  // coin-identity check (arb/coinmarketcap.ts) and the market-cap gate
+  // (arb/marketCap.ts), used alongside CoinGecko. CoinGecko's free public API
+  // has a very low rate limit and will show as "DOWN" on the network map
+  // under normal use across 8 exchanges; when that happens, entries that
+  // can't be verified via CoinGecko fall back to CMC instead of just staying
+  // blocked, if this key is set. Get a free key (10k credits/month, no
+  // credit card) at https://pro.coinmarketcap.com/signup.
+  // Safe for: server-only.
+  COINMARKETCAP_API_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -51,8 +51,27 @@ function fixBrokenMomentumScoresSchema() {
   }
 }
 
+/** coingecko_id was originally NOT NULL (CoinGecko was the only identity
+ * source) — anyone who ran the arb bot before CoinMarketCap became a second,
+ * independent source has that constraint baked into their existing table,
+ * which SQLite's ALTER TABLE ADD COLUMN cannot relax. A row that only has a
+ * cmc_id (CoinGecko failed/rate-limited for that exchange, CMC filled in
+ * instead) would then fail to insert. This table is a pure rebuildable
+ * cache — safe to drop and let it repopulate on the next identity refresh. */
+function fixBrokenCoinIdentityCacheSchema() {
+  const exists = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'coin_identity_cache'").get();
+  if (!exists) return;
+  const columns = db.prepare("PRAGMA table_info(coin_identity_cache)").all() as Array<{ name: string; notnull: number }>;
+  const broken = columns.find((c) => c.name === "coingecko_id" && c.notnull === 1);
+  if (broken) {
+    db.exec("DROP TABLE coin_identity_cache");
+    logger.warn("Recreating coin_identity_cache table — coingecko_id needs to become nullable now that CoinMarketCap is an optional second identity source.");
+  }
+}
+
 function runMigrations() {
   fixBrokenMomentumScoresSchema();
+  fixBrokenCoinIdentityCacheSchema();
   const sql = readFileSync(join(__dirname, "migrations.sql"), "utf-8");
   db.exec(sql);
 
@@ -80,6 +99,13 @@ function runMigrations() {
   // excursion (MAE) logging alongside the existing max-favorable-excursion
   // (trailing high).
   ensureColumn("positions", "lowest_price_seen_usd", "TEXT");
+
+  // coingecko_id was originally NOT NULL / the only identity source; anyone
+  // running an earlier version of the arb bot has a coin_identity_cache
+  // without cmc_id. CoinMarketCap is now an optional second identity source
+  // (see arb/coinmarketcap.ts) — this makes the column nullable-by-addition
+  // without touching any existing coingecko_id data.
+  ensureColumn("coin_identity_cache", "cmc_id", "TEXT");
 
   const account = db.prepare("SELECT id FROM paper_account WHERE id = 1").get();
   if (!account) {

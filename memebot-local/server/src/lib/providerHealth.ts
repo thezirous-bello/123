@@ -16,7 +16,8 @@ export type ProviderId =
   | "mexc"
   | "kraken"
   | "bitstamp"
-  | "coingecko";
+  | "coingecko"
+  | "coinmarketcap";
 
 export interface ProviderHealthState {
   provider: ProviderId;

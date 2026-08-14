@@ -1,14 +1,18 @@
 import { Decimal } from "../lib/decimal.js";
 import type { IdentityCheckResult } from "./identity.js";
 import type { DepositGateResult } from "./exchanges/auth/index.js";
+import type { MarketCapCheckResult } from "./marketCap.js";
 
 export interface EntryGateInput {
   identity: IdentityCheckResult;
   depositGate: DepositGateResult;
+  marketCap: MarketCapCheckResult;
   netSpreadPct: number;
   minNetSpreadPct: number;
+  minMarketCapUsd: number;
   requireCoinIdentityVerified: boolean;
   requireDepositVerified: boolean;
+  requireMinMarketCap: boolean;
 }
 
 export interface GateResult {
@@ -17,7 +21,7 @@ export interface GateResult {
 }
 
 /**
- * The three hard gates a candidate opportunity must clear before this app
+ * The four hard gates a candidate opportunity must clear before this app
  * will simulate acting on it:
  *   1. The buy and sell exchanges must resolve to the SAME underlying coin
  *      for this ticker (not just the same symbol string) — the direct fix
@@ -25,10 +29,13 @@ export interface GateResult {
  *   2. The coin must be currently deposit-enabled on the sell exchange — the
  *      direct fix for "bought on platform 1, but platform 2 had deposits
  *      blocked, wasting the fee for nothing."
- *   3. Net spread must clear the configured minimum (default >1%) — not a
+ *   3. The coin's market cap must clear the configured minimum (default
+ *      $50M) — skips thin/illiquid markets where the quoted spread is more
+ *      likely to be stale or unfillable at size.
+ *   4. Net spread must clear the configured minimum (default >1%) — not a
  *      rounding-error-sized "opportunity."
- * "unverifiable" for either check 1 or 2 is treated as a fail, never a
- * pass — never trade on data we don't actually have.
+ * "unverifiable" for checks 1-3 is treated as a fail, never a pass — never
+ * trade on data we don't actually have.
  */
 export function evaluateEntryGates(input: EntryGateInput): GateResult {
   if (input.requireCoinIdentityVerified && input.identity !== "match") {
@@ -47,6 +54,15 @@ export function evaluateEntryGates(input: EntryGateInput): GateResult {
         input.depositGate === "disabled"
           ? "Deposits are currently disabled for this coin on the sell exchange — would strand the capital there."
           : "Could not verify deposit status on the sell exchange (no API key configured for it, or the check failed) — refusing to risk stranding capital there.",
+    };
+  }
+  if (input.requireMinMarketCap && input.marketCap !== "sufficient") {
+    return {
+      passed: false,
+      reason:
+        input.marketCap === "insufficient"
+          ? `Market cap is below the configured $${input.minMarketCapUsd.toLocaleString()} minimum — skipping a thin/illiquid market.`
+          : "Could not verify this coin's market cap yet (no cached data) — refusing to trade an unverified coin.",
     };
   }
   if (input.netSpreadPct < input.minNetSpreadPct) {

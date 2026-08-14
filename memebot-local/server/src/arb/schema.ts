@@ -10,10 +10,10 @@ import { ALL_EXCHANGE_IDS } from "./exchanges/index.js";
 // than wiring up real cross-exchange execution.
 const ExchangeIdSchema = z.enum(ALL_EXCHANGE_IDS as [ExchangeId, ...ExchangeId[]]);
 
-// ~500 real coin tickers spanning majors, L1/L2s, DeFi, oracles/infra,
+// ~540 real coin tickers spanning majors, L1/L2s, DeFi, oracles/infra,
 // gaming/metaverse, AI/DePIN, meme, exchange tokens, privacy, RWA/payments,
-// staking derivatives, and several exchange-specific ecosystems (Cosmos,
-// Polkadot, BSC, Solana) — deduplicated (case-insensitive) at build time, see
+// staking/restaking derivatives, and several exchange-specific ecosystems
+// (Cosmos, Polkadot, BSC, Solana) — deduplicated (case-insensitive) at build time, see
 // the superRefine check below which would otherwise reject a duplicate. A
 // symbol missing on a given exchange just doesn't get a quote there for that
 // scan (see findBestOpportunity), so this list can safely run far wider than
@@ -74,6 +74,17 @@ export const DEFAULT_ARB_SYMBOLS: string[] = [
   "PROS", "TVK", "ERN", "PUNDIX", "BOND", "FIDA", "MLN", "NKN", "OAX", "PNT",
   "QUICK", "RAD", "TORN", "UFT", "VGX", "WNXM", "XNO", "ZKS", "ARPA", "BLZ",
   "CTK", "DEGO", "EPX",
+  // Second curated pass — more L1/L2 infra, cross-chain, restaking, RWA,
+  // AI-agent, and 2024/2025-launch tickers not already covered above. Like
+  // the rest of this list, this is manually curated from general knowledge,
+  // not fetched from a live top-N-by-market-cap source — the runtime
+  // minMarketCapUsd gate (see journeyEngine.ts) is what actually enforces
+  // "worth trading," not this list's size.
+  "MNT", "LUNA", "LUNC", "USTC", "FLR", "SGB", "CSPR", "XCN", "MINA", "T",
+  "NU", "KEEP", "SYN", "HOP", "ACX", "NEON", "AURORA", "ID", "VIRTUAL", "OLAS",
+  "TRUMP", "MELANIA", "WEN", "ZETA", "THE", "GEAR", "ANGLE", "EIGEN", "LISTA", "ATH",
+  "BABY", "PLUME", "BERA", "AIXBT", "LINEA", "RSR", "XEC", "KLV", "BSW", "HFT",
+  "SSV",
 ];
 
 export const ArbStrategyConfigObjectSchema = z
@@ -118,6 +129,12 @@ export const ArbStrategyConfigObjectSchema = z
     // not the default.
     requireCoinIdentityVerified: z.boolean().default(true),
     requireDepositVerified: z.boolean().default(true),
+
+    // Skips thin/illiquid coins whose quoted spread is more likely stale or
+    // unfillable at real size — resolved via whichever identity source
+    // (CoinGecko or CoinMarketCap) has data for the coin, see arb/marketCap.ts.
+    minMarketCapUsd: z.number().gte(0).default(50_000_000),
+    requireMinMarketCap: z.boolean().default(true),
 
     startingBalanceUsd: z.number().gt(0).default(10_000),
   })
