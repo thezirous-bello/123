@@ -15,7 +15,10 @@ import type { ExchangeId } from "./exchanges/index.js";
 const COINGECKO_EXCHANGE_SLUG: Record<ExchangeId, string> = {
   binance: "binance",
   bybit: "bybit_spot",
-  okx: "okx",
+  // "okx" itself resolved 0 tickers in real-world testing while every
+  // other exchange here resolved hundreds — CoinGecko still uses OKX's
+  // pre-rebrand id from when it was OKEx.
+  okx: "okex",
   kucoin: "kucoin",
   gateio: "gate",
   mexc: "mxc",

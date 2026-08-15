@@ -6,7 +6,10 @@ import type { BalanceCheckResult, DepositCheckResult, ExchangeAuthClient } from 
 
 // Bitstamp's v2 signing scheme: message = "BITSTAMP " + api_key + http_verb
 // + host + path + query_string + content_type + nonce + timestamp + "v2" +
-// body, signature = HMAC-SHA256(api_secret, message) hex uppercase.
+// body, signature = HMAC-SHA256(api_secret, message) hex uppercase. Every
+// component is concatenated even when empty — query_string and body are
+// both "" for this no-body, no-query balance call, but the formula still
+// has a slot for each (this matters if a future endpoint here ever needs one).
 // Headers: X-Auth, X-Auth-Signature, X-Auth-Nonce, X-Auth-Timestamp,
 // X-Auth-Version. This app can't verify the exact request/response shape
 // against a live account from this environment — auth failures are logged
@@ -32,9 +35,10 @@ async function signedPost<T>(path: string): Promise<{ data: T | null; error: str
   if (!env.BITSTAMP_API_KEY || !env.BITSTAMP_API_SECRET) return { data: null, error: "not configured" };
   const nonce = randomUUID();
   const timestamp = Date.now().toString();
+  const queryString = "";
   const contentType = "";
   const body = "";
-  const message = `BITSTAMP ${env.BITSTAMP_API_KEY}POST${HOST}${path}${contentType}${nonce}${timestamp}v2${body}`;
+  const message = `BITSTAMP ${env.BITSTAMP_API_KEY}POST${HOST}${path}${queryString}${contentType}${nonce}${timestamp}v2${body}`;
   const signature = sign(message, env.BITSTAMP_API_SECRET);
 
   const startedAt = performance.now();
