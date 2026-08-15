@@ -26,19 +26,44 @@ interface MexcCoinConfig {
   networkList?: Array<{ network: string; depositEnable?: boolean }>;
 }
 
-// MEXC rejects a request outright if the local clock has drifted from
-// MEXC's server clock by more than recvWindow — 5000ms (their common
-// default) is tight enough that ordinary local clock drift (a machine
-// whose OS time sync is stale/off, not unusual on Windows) trips it. 60000
-// is the max MEXC's Binance-compatible API generally accepts; using it
-// doesn't weaken anything meaningful (recvWindow is a freshness window,
-// not a security secret) and avoids depending on the local clock being
-// accurate to the second.
+// MEXC rejects a request outright if the timestamp it receives is more
+// than recvWindow away from MEXC's own server clock. Widening recvWindow
+// alone assumes the local OS clock is close but not perfectly synced —
+// that turned out not to be enough here, which means the actual drift is
+// larger than a "normal" amount. Rather than keep guessing at how far off
+// the local clock is, this asks MEXC directly (its public, unauthenticated
+// /api/v3/time endpoint) what time it thinks it is, and applies that exact
+// offset to every signed request's timestamp — this is correct regardless
+// of how wrong the local clock is, and is what production exchange clients
+// do rather than trusting the local OS clock. Cached briefly so this
+// doesn't add a request to every signed call.
 const RECV_WINDOW_MS = 60_000;
+const SERVER_TIME_CACHE_MS = 5 * 60_000;
+
+let cachedOffsetMs = 0;
+let offsetCachedAtMs = 0;
+
+async function getMexcTimeOffsetMs(): Promise<number> {
+  const now = Date.now();
+  if (now - offsetCachedAtMs < SERVER_TIME_CACHE_MS) return cachedOffsetMs;
+  try {
+    const res = await fetch(`${BASE_URL}/api/v3/time`);
+    if (!res.ok) return cachedOffsetMs; // keep the last known-good offset rather than falling back to 0 (untrusted local clock)
+    const data = (await res.json()) as { serverTime?: number };
+    if (typeof data.serverTime !== "number") return cachedOffsetMs;
+    cachedOffsetMs = data.serverTime - Date.now();
+    offsetCachedAtMs = now;
+    logger.info({ offsetMs: cachedOffsetMs }, "MEXC server time offset refreshed");
+  } catch {
+    // Network hiccup fetching server time — keep the last known-good offset.
+  }
+  return cachedOffsetMs;
+}
 
 async function signedGet<T>(path: string): Promise<{ data: T | null; error: string | null }> {
   if (!env.MEXC_API_KEY || !env.MEXC_API_SECRET) return { data: null, error: "not configured" };
-  const timestamp = Date.now().toString();
+  const offsetMs = await getMexcTimeOffsetMs();
+  const timestamp = (Date.now() + offsetMs).toString();
   const query = `timestamp=${timestamp}&recvWindow=${RECV_WINDOW_MS}`;
   const signature = sign(query, env.MEXC_API_SECRET);
   const url = `${BASE_URL}${path}?${query}&signature=${signature}`;
