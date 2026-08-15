@@ -253,7 +253,8 @@ export function ArbitragePanel() {
                 <th className="pb-1 pr-3">API Key</th>
                 <th className="pb-1 pr-3">Coin Identity Data</th>
                 <th className="pb-1 pr-3">Real Balance</th>
-                <th className="pb-1">Bot Capital In Flight</th>
+                <th className="pb-1 pr-3">Bot Capital In Flight</th>
+                <th className="pb-1">Last Error</th>
               </tr>
             </thead>
             <tbody className="font-mono text-white/70">
@@ -264,7 +265,9 @@ export function ArbitragePanel() {
                     <Badge tone={h.apiKeyConfigured ? "good" : "warn"}>{h.apiKeyConfigured ? "CONFIGURED" : "NOT SET"}</Badge>
                   </td>
                   <td className="py-1 pr-3">
-                    <Badge tone={h.identityDataCached ? "good" : "neutral"}>{h.identityDataCached ? "CACHED" : "PENDING"}</Badge>
+                    <Badge tone={h.identityDataCached ? "good" : "neutral"}>
+                      {h.identityDataCached ? `${h.identitySymbolCount} SYMBOLS` : "PENDING"}
+                    </Badge>
                   </td>
                   <td className="py-1 pr-3">
                     {h.realBalance.hasRealFunds === null ? (
@@ -273,14 +276,18 @@ export function ArbitragePanel() {
                       <Badge tone={h.realBalance.hasRealFunds ? "accent" : "neutral"}>{h.realBalance.hasRealFunds ? "HAS FUNDS" : "EMPTY"}</Badge>
                     )}
                   </td>
-                  <td className="py-1 text-white/70">${Number(h.botCommittedCapitalUsd).toFixed(2)}</td>
+                  <td className="py-1 pr-3 text-white/70">${Number(h.botCommittedCapitalUsd).toFixed(2)}</td>
+                  <td className="py-1 max-w-[260px] truncate text-red-300/80" title={h.lastError ?? ""}>
+                    {h.lastError ? h.lastError : <span className="text-white/20">—</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <p className="mt-2 text-[10px] text-white/30">
-          Real balances are informational only — the bot never trades against them, and existing funds on any exchange are never touched.
+          Real balances are informational only — the bot never trades against them, and existing funds on any exchange are never touched. Last error
+          covers both public market-data calls and (if configured) authenticated deposit/balance checks for that exchange — hover to see the full message.
         </p>
       </Panel>
 

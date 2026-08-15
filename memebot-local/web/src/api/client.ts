@@ -707,8 +707,11 @@ export interface ArbExchangeHealth {
   exchange: ExchangeId;
   apiKeyConfigured: boolean;
   identityDataCached: boolean;
+  identitySymbolCount: number;
   realBalance: { exchange: ExchangeId; hasRealFunds: boolean | null; checkedAt: string | null };
   botCommittedCapitalUsd: string;
+  lastError: string | null;
+  lastErrorAt: string | null;
 }
 
 export interface ArbOpportunity {

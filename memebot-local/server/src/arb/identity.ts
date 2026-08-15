@@ -111,6 +111,8 @@ async function refreshExchangeIdentity(exchange: ExchangeId): Promise<{ found: n
   }
   if (found === 0 && !rateLimited) {
     logger.warn({ exchange, slug }, "CoinGecko identity refresh found 0 USDT tickers for this exchange — check COINGECKO_EXCHANGE_SLUG in arb/identity.ts");
+  } else if (found > 0) {
+    logger.info({ exchange, slug, found }, "CoinGecko identity refresh resolved USDT tickers for this exchange");
   }
   return { found, rateLimited };
 }
@@ -188,6 +190,19 @@ export function isSameCoinAcrossExchanges(symbol: string, exchangeA: ExchangeId,
 export function hasIdentityDataFor(exchange: ExchangeId): boolean {
   const row = db.prepare("SELECT 1 FROM coin_identity_cache WHERE exchange_id = ? AND (coingecko_id IS NOT NULL OR cmc_id IS NOT NULL) LIMIT 1").get(exchange);
   return !!row;
+}
+
+/** How many symbols this exchange currently has identity data for — a
+ * boolean "cached" badge can't tell you whether an exchange's CoinGecko
+ * slug is actually resolving correctly (a handful of matches) vs. barely
+ * working (e.g. one stray symbol) vs. genuinely covering the exchange
+ * (hundreds); this makes that visible in the Exchange Health panel instead
+ * of only in server logs. */
+export function countIdentityDataFor(exchange: ExchangeId): number {
+  const row = db.prepare("SELECT COUNT(*) as c FROM coin_identity_cache WHERE exchange_id = ? AND (coingecko_id IS NOT NULL OR cmc_id IS NOT NULL)").get(
+    exchange,
+  ) as { c: number };
+  return row.c;
 }
 
 /** Resolves the best-available canonical coin id for symbol@exchange —

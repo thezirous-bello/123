@@ -7,7 +7,8 @@ import { getArbBotState } from "../arb/state.js";
 import { botControlledCapitalByExchange, listArbTrades, listExchangeBalances, listJourneys, listOpportunities, realizedPnlSinceArb } from "../arb/repository.js";
 import { ALL_EXCHANGE_IDS } from "../arb/exchanges/index.js";
 import { listExchangeAuthStatus } from "../arb/exchanges/auth/index.js";
-import { hasIdentityDataFor } from "../arb/identity.js";
+import { hasIdentityDataFor, countIdentityDataFor } from "../arb/identity.js";
+import { getProviderHealth } from "../lib/providerHealth.js";
 
 const EmergencyStopBodySchema = z.object({ reason: z.string().min(1).max(500) });
 const ResumeBodySchema = z.object({ confirm: z.literal(true) });
@@ -109,20 +110,29 @@ export default async function arbRoutes(app: FastifyInstance) {
   /** Per-exchange operational status the dashboard needs to explain WHY a
    * given exchange isn't completing trades: whether a read-only API key is
    * configured for it, whether it has cached coin-identity data yet, its
-   * real (informational-only) balance snapshot, and how much of the bot's
-   * own paper capital is currently in flight there. */
+   * real (informational-only) balance snapshot, how much of the bot's own
+   * paper capital is currently in flight there, and the last error any call
+   * to that exchange hit (so an auth failure like MEXC's "Api key info
+   * invalid" shows up here instead of only in the server's terminal log). */
   app.get("/arb/exchange-health", async () => {
     const config = getArbStrategyConfig();
     const authStatus = listExchangeAuthStatus(config.exchanges);
     const balances = listExchangeBalances(config.exchanges);
     const committed = botControlledCapitalByExchange();
     const balanceByExchange = new Map(balances.map((b) => [b.exchange, b]));
-    return config.exchanges.map((exchange) => ({
-      exchange,
-      apiKeyConfigured: authStatus.find((a) => a.exchange === exchange)?.configured ?? false,
-      identityDataCached: hasIdentityDataFor(exchange),
-      realBalance: balanceByExchange.get(exchange) ?? { exchange, hasRealFunds: null, checkedAt: null },
-      botCommittedCapitalUsd: committed[exchange]?.toFixed() ?? "0",
-    }));
+    const providerHealthByExchange = new Map(getProviderHealth().map((h) => [h.provider, h]));
+    return config.exchanges.map((exchange) => {
+      const health = providerHealthByExchange.get(exchange);
+      return {
+        exchange,
+        apiKeyConfigured: authStatus.find((a) => a.exchange === exchange)?.configured ?? false,
+        identityDataCached: hasIdentityDataFor(exchange),
+        identitySymbolCount: countIdentityDataFor(exchange),
+        realBalance: balanceByExchange.get(exchange) ?? { exchange, hasRealFunds: null, checkedAt: null },
+        botCommittedCapitalUsd: committed[exchange]?.toFixed() ?? "0",
+        lastError: health?.lastError ?? null,
+        lastErrorAt: health?.lastFailureAt ?? null,
+      };
+    });
   });
 }
