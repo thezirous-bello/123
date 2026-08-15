@@ -26,10 +26,20 @@ interface MexcCoinConfig {
   networkList?: Array<{ network: string; depositEnable?: boolean }>;
 }
 
+// MEXC rejects a request outright if the local clock has drifted from
+// MEXC's server clock by more than recvWindow — 5000ms (their common
+// default) is tight enough that ordinary local clock drift (a machine
+// whose OS time sync is stale/off, not unusual on Windows) trips it. 60000
+// is the max MEXC's Binance-compatible API generally accepts; using it
+// doesn't weaken anything meaningful (recvWindow is a freshness window,
+// not a security secret) and avoids depending on the local clock being
+// accurate to the second.
+const RECV_WINDOW_MS = 60_000;
+
 async function signedGet<T>(path: string): Promise<{ data: T | null; error: string | null }> {
   if (!env.MEXC_API_KEY || !env.MEXC_API_SECRET) return { data: null, error: "not configured" };
   const timestamp = Date.now().toString();
-  const query = `timestamp=${timestamp}&recvWindow=5000`;
+  const query = `timestamp=${timestamp}&recvWindow=${RECV_WINDOW_MS}`;
   const signature = sign(query, env.MEXC_API_SECRET);
   const url = `${BASE_URL}${path}?${query}&signature=${signature}`;
 
